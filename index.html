@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>WebGL FNAF Project</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: sans-serif; }
+        #webgl-canvas { width: 100vw; height: 100vh; display: block; }
+        
+        /* 遊戲的 2D UI 疊層 */
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        
+        /* 互動按鈕：開啟 pointer-events 讓滑鼠可以點擊 */
+        .btn { pointer-events: auto; position: absolute; padding: 15px 30px; font-size: 20px; cursor: pointer; background: rgba(255,255,255,0.2); color: white; border: 2px solid white; border-radius: 10px;}
+        .btn:hover { background: rgba(255,255,255,0.5); }
+
+        #btn-door-left { bottom: 20%; left: 5%; }
+        #btn-light-left { bottom: 10%; left: 5%; }
+        #btn-monitor { bottom: 5%; left: 50%; transform: translateX(-50%); width: 300px;}
+    </style>
+</head>
+<body>
+    <canvas id="webgl-canvas"></canvas>
+
+    <div id="ui-layer">
+        <button id="btn-door-left" class="btn">Toggle Left Door</button>
+        <button id="btn-light-left" class="btn">Toggle Left Light</button>
+        <button id="btn-monitor" class="btn">Open Monitor</button>
+    </div>
+
+    <script src="cuon-matrix.js"></script> <script src="assets.js"></script>      
+    <script src="WebGL.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
+    
