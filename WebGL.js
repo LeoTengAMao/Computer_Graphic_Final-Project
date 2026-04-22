@@ -70,30 +70,56 @@ const Renderer = {
             );
         } else {
             // 原本的保安視角 (鎖定在警衛室)
-            viewMatrix.setLookAt(0, 2, 5,  0, 2, 0,  0, 1, 0); 
+            // setLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
+            // 眼睛位置：(0, 3, 5) - 在 Z=5 處，稍微抬高 Y=3
+            // 看向的點：(0, 2, 0) - 看向原點的 Y=2 高度
+            // 上向量：(0, 1, 0) - Y 軸向上，保持相機正向
+            viewMatrix.setLookAt(0, 3, 5,  0, 2, 0,  0, 1, 0); 
         }
 
         // --- 開始捏地圖 (Blockout) ---
         // 使用 drawBlock(proj, view, X, Y, Z, 縮放X, 縮放Y, 縮放Z, 顏色R, 顏色G, 顏色B)
+        // ==========================================
+        // 📍 你的警衛室 (Security Office) Blockout
+        // ==========================================
 
-        // 1. 地板 (灰色，壓扁放大)
-        this.drawBlock(projMatrix, viewMatrix,  0, 0, 0,  10, 0.1, 10,  0.5, 0.5, 0.5);
-        
-        // 2. 左邊的牆壁 (暗紅色)
-        this.drawBlock(projMatrix, viewMatrix, -10, 5, 0,  0.5, 5, 10,  0.6, 0.2, 0.2);
-        
-        // 3. 右邊的牆壁 (暗紅色)
-        this.drawBlock(projMatrix, viewMatrix,  10, 5, 0,  0.5, 5, 10,  0.6, 0.2, 0.2);
+        // 1. 警衛室地板 (灰色)
+        this.drawBlock(projMatrix, viewMatrix, 0, 0, 5,  4, 0.1, 3,  0.3, 0.3, 0.3);
 
-        // 4. 前面的牆壁 (留一個門的缺口)
-        this.drawBlock(projMatrix, viewMatrix, -6, 5, -10,  4, 5, 0.5,  0.6, 0.2, 0.2);
-        this.drawBlock(projMatrix, viewMatrix,  6, 5, -10,  4, 5, 0.5,  0.6, 0.2, 0.2);
-        this.drawBlock(projMatrix, viewMatrix,  0, 8, -10,  2, 2, 0.5,  0.6, 0.2, 0.2); // 門樑
+        // 2. 你的辦公桌 (深棕色) - 放在你面前 Z=4 的位置
+        this.drawBlock(projMatrix, viewMatrix, 0, 1, 4,  1.5, 0.1, 0.5,  0.4, 0.2, 0.1);
+        this.drawBlock(projMatrix, viewMatrix, -1.2, 0.5, 4,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 左桌腳
+        this.drawBlock(projMatrix, viewMatrix,  1.2, 0.5, 4,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 右桌腳
 
-        // 5. 保安的辦公桌 (深棕色)
-        this.drawBlock(projMatrix, viewMatrix,  0, 1.5, 3,  3, 0.2, 1.5,  0.4, 0.2, 0.1);
-        this.drawBlock(projMatrix, viewMatrix, -2.5, 0.75, 3,  0.2, 0.75, 1.5,  0.4, 0.2, 0.1); // 桌腳
-        this.drawBlock(projMatrix, viewMatrix,  2.5, 0.75, 3,  0.2, 0.75, 1.5,  0.4, 0.2, 0.1); // 桌腳
+        // 3. 🛡️ 正前方牆壁 (包含 Window 和 Door 1) - Z=2
+        // 窗戶左邊的牆
+        this.drawBlock(projMatrix, viewMatrix, -3.0, 2.5, 2,  0.75, 2.5, 0.2,  0.2, 0.3, 0.3); 
+        // 窗戶下方的牆 (窗台，這樣上面就空出來變成窗戶了)
+        this.drawBlock(projMatrix, viewMatrix, -1.5, 0.8, 2,  1.5, 0.8, 0.2,  0.2, 0.3, 0.3); 
+        // 窗戶上方的牆 (窗台，這樣上面就空出來變成窗戶了)
+        this.drawBlock(projMatrix, viewMatrix, -1.5, 4.2, 2,  1.5, 0.8, 0.2,  0.2, 0.3, 0.3); 
+        // 窗戶與 Door 1 中間的柱子
+        this.drawBlock(projMatrix, viewMatrix, 0.5, 2.5, 2,  0.5, 2.5, 0.2,  0.2, 0.3, 0.3); 
+        // Door 1 的門樑 (門洞上方)
+        this.drawBlock(projMatrix, viewMatrix, 2, 4, 2,  1, 1, 0.2,  0.2, 0.3, 0.3); 
+        // Door 1 右邊的牆
+        this.drawBlock(projMatrix, viewMatrix, 3.5, 2.5, 2,  0.5, 2.5, 0.2,  0.2, 0.3, 0.3); 
+
+        // 4. 🛡️ 左邊牆壁 (包含 Door 2) - X=-4
+        // 門前方的牆
+        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 3,  0.2, 2.5, 1,  0.2, 0.3, 0.3);
+        // 門後方的牆
+        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 6.5, 0.2, 2.5, 1.5, 0.2, 0.3, 0.3);
+        // Door 2 的門樑
+        this.drawBlock(projMatrix, viewMatrix, -4, 4, 4.75,  0.2, 1, 0.75, 0.2, 0.3, 0.3);
+
+        // 5. 🛡️ 右邊牆壁 (包含 Vent 通風管) - X=4
+        this.drawBlock(projMatrix, viewMatrix, 4, 2.5, 5,  0.2, 2.5, 3,  0.2, 0.3, 0.3); // 右邊主牆
+        // 用一個黑色的深色方塊假裝是通風管的開口 (Z=6 稍微靠後)
+        this.drawBlock(projMatrix, viewMatrix, 3.9, 0.5, 6,  0.3, 0.5, 0.5,  0.05, 0.05, 0.05); 
+
+        // 6. 警衛室背後的牆壁 - Z=8
+        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 8,  4, 2.5, 0.2,  0.2, 0.3, 0.3);
     },
 
     // 🌟 蓋房子的積木函式：把原本 1x1 的方塊位移、縮放、上色

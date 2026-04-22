@@ -1,7 +1,7 @@
 // game.js
 const GameState = {
     time: 0,
-    obMode: false, // 預設開啟 OB 模式，按 'O' 鍵可以切換
+    obMode: true, // 預設開啟 OB 模式，按 'O' 鍵可以切換
     
     // OB 攝影機狀態
     obCam: { x: 0, y: 15, z: 20, pitch: -30, yaw: 0 }, 
