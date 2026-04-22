@@ -109,9 +109,9 @@ const Renderer = {
         // 門前方的牆
         this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 3,  0.2, 2.5, 1,  0.2, 0.3, 0.3);
         // 門後方的牆
-        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 6.5, 0.2, 2.5, 1.5, 0.2, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 7.0, 0.2, 2.5, 1.0, 0.2, 0.3, 0.3);
         // Door 2 的門樑
-        this.drawBlock(projMatrix, viewMatrix, -4, 4, 4.75,  0.2, 1, 0.75, 0.2, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, -4, 4, 5.25,  0.2, 1, 1.3, 0.2, 0.3, 0.3);
 
         // 5. 🛡️ 右邊牆壁 (包含 Vent 通風管) - X=4
         this.drawBlock(projMatrix, viewMatrix, 4, 2.5, 5,  0.2, 2.5, 3,  0.2, 0.3, 0.3); // 右邊主牆
