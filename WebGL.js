@@ -1,6 +1,6 @@
 // WebGL.js
 const Renderer = {
-    gl: null, canvas: null, program: null, cubeBufferInfo: null,
+    gl: null, canvas: null, program: null, cubeBufferInfo: null, cylinderBufferInfo: null,
 
     // Shader 增加一個 u_BaseColor，讓我們可以改變方塊顏色
     VSHADER_SOURCE: `
@@ -33,6 +33,7 @@ const Renderer = {
         this.gl.useProgram(this.program);
         this.gl.enable(this.gl.DEPTH_TEST);
         this.initCube();
+        this.initCylinder();
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
         return true;
@@ -42,6 +43,104 @@ const Renderer = {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    },
+
+    initCylinder: function() {
+        let segments = 32; // 切成 32 面，看起來就會很圓
+        let positions = [];
+        let normals = [];
+        let indices = [];
+
+        // 1. 製作側邊牆壁
+        for (let i = 0; i <= segments; i++) {
+            let theta = (i / segments) * 2 * Math.PI;
+            let x = Math.cos(theta);
+            let z = Math.sin(theta);
+
+            // 上緣頂點 (Y=1)
+            positions.push(x, 1, z);
+            normals.push(x, 0, z); // 法線朝外
+            // 下緣頂點 (Y=-1)
+            positions.push(x, -1, z);
+            normals.push(x, 0, z);
+        }
+
+        // 把側邊頂點連成三角形
+        for (let i = 0; i < segments; i++) {
+            let p1 = i * 2;
+            let p2 = i * 2 + 1;
+            let p3 = (i + 1) * 2;
+            let p4 = (i + 1) * 2 + 1;
+            indices.push(p1, p2, p3);
+            indices.push(p3, p2, p4);
+        }
+
+        // 2. 製作上方圓形蓋子 (舞台表面)
+        let topCenterIdx = positions.length / 3;
+        positions.push(0, 1, 0); // 蓋子中心點
+        normals.push(0, 1, 0);   // 法線朝上
+        
+        let topStartIdx = positions.length / 3;
+        for (let i = 0; i <= segments; i++) {
+            let theta = (i / segments) * 2 * Math.PI;
+            positions.push(Math.cos(theta), 1, Math.sin(theta));
+            normals.push(0, 1, 0);
+        }
+        for (let i = 0; i < segments; i++) {
+            indices.push(topCenterIdx, topStartIdx + i + 1, topStartIdx + i);
+        }
+
+        // 將陣列轉換為 WebGL 緩衝區
+        let vBuffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vBuffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+
+        let nBuffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, nBuffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(normals), this.gl.STATIC_DRAW);
+
+        let iBuffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, iBuffer);
+        // 🌟 注意：頂點數超過 256，必須用 Uint16Array (UNSIGNED_SHORT)
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+
+        this.cylinderBufferInfo = { 
+            vertexBuffer: vBuffer, 
+            normalBuffer: nBuffer, 
+            indexBuffer: iBuffer,
+            indexCount: indices.length // 紀錄要畫幾個點
+        };
+    },
+
+    // 🌟 技能 2：專門畫圓柱體的函數 (跟 drawBlock 幾乎一樣，只是換了 Buffer)
+    drawCylinder: function(proj, view, tx, ty, tz, sx, sy, sz, r, g, b) {
+        let modelMatrix = new Matrix4();
+        modelMatrix.translate(tx, ty, tz);
+        modelMatrix.scale(sx, sy, sz);
+
+        let mvpMatrix = new Matrix4();
+        mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
+        let normalMatrix = new Matrix4();
+        normalMatrix.setInverseOf(modelMatrix).transpose();
+
+        this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
+        this.gl.uniform3f(this.gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b);
+
+        // 綁定圓柱體的 Buffer
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.cylinderBufferInfo.vertexBuffer);
+        let a_Position = this.gl.getAttribLocation(this.program, 'a_Position');
+        this.gl.vertexAttribPointer(a_Position, 3, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(a_Position);
+
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, this.cylinderBufferInfo.normalBuffer);
+        let a_Normal = this.gl.getAttribLocation(this.program, 'a_Normal');
+        this.gl.vertexAttribPointer(a_Normal, 3, this.gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(a_Normal);
+
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.cylinderBufferInfo.indexBuffer);
+        // 🌟 呼叫 GPU 繪製 (使用 UNSIGNED_SHORT)
+        this.gl.drawElements(this.gl.TRIANGLES, this.cylinderBufferInfo.indexCount, this.gl.UNSIGNED_SHORT, 0);
     },
 
     draw: function(gameState) {
@@ -116,7 +215,7 @@ const Renderer = {
         // 5. 🛡️ 右邊牆壁 (包含 Vent 通風管) - X=4
         this.drawBlock(projMatrix, viewMatrix, 4, 2.5, 11,  0.2, 2.5, 3,  0.2, 0.3, 0.3); // 右邊主牆
         // 用一個黑色的深色方塊假裝是通風管的開口 (Z=13 稍微靠後)
-        this.drawBlock(projMatrix, viewMatrix, 3.9, 0.5, 12,  0.3, 0.5, 0.5,  0.05, 0.05, 0.05); 
+        this.drawBlock(projMatrix, viewMatrix, 3.8, 1.0, 12,  0.3, 1, 1,  0.05, 0.05, 0.05); 
 
         // 6. 警衛室背後的牆壁 - Z=15
         this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 14,  4, 2.5, 0.2,  0.2, 0.3, 0.3);
@@ -128,6 +227,8 @@ const Renderer = {
         // --- 1. 全區大地板 ---
         // 從警衛室前方一直延伸到舞台的深灰色大地板
         this.drawBlock(projMatrix, viewMatrix, 0, -0.05, -10,  25, 0.1, 25 ,  0.2, 0.2, 0.25);
+        this.drawBlock(projMatrix, viewMatrix, 30, -0.05, -10,  15, 0.1, 25 ,  0.2, 0.2, 0.25); // 右邊延伸出去的地板
+        this.drawBlock(projMatrix, viewMatrix, 0, -0.05, 30,  25, 0.1, 25 ,  0.2, 0.2, 0.25);
 
         // --- 2. 外部圍牆 (地圖的最外緣，暗紅色) ---
         // 北邊牆壁 (舞台後方)
@@ -141,14 +242,24 @@ const Renderer = {
 
         // --- 3. 🍕 主要用餐區 (Dining Area) ---
         // 你的 4 張長桌 (棕色)
-        this.drawBlock(projMatrix, viewMatrix, -3.5, 1, -12,  0.8, 0.1, 6,   0.4, 0.2, 0.1); // 最左桌
-        this.drawBlock(projMatrix, viewMatrix,  0, 1, -12,  0.8, 0.1, 6,   0.4, 0.2, 0.1); // 左中桌
-        this.drawBlock(projMatrix, viewMatrix, 3.5, 1, -12,  0.8, 0.1, 6,   0.4, 0.2, 0.1); // 右中桌
+        this.drawBlock(projMatrix, viewMatrix, -7.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
+
+        this.drawBlock(projMatrix, viewMatrix, -3.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
+
+        this.drawBlock(projMatrix, viewMatrix, 3.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
+        
+        this.drawBlock(projMatrix, viewMatrix, 7.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
+
+        this.drawBlock(projMatrix, viewMatrix, -7.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
+
+        this.drawBlock(projMatrix, viewMatrix, -3.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
+
+        this.drawBlock(projMatrix, viewMatrix, 3.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
+        
+        this.drawBlock(projMatrix, viewMatrix, 7.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
         
 
-        // 區隔用餐區與警衛室走廊的南邊牆壁 (Z = -2)
-        this.drawBlock(projMatrix, viewMatrix, -7.5, 2.5, -2,  4.5, 2.5, 0.2,  0.5, 0.15, 0.15); // 左半邊牆
-        this.drawBlock(projMatrix, viewMatrix,  7.5, 2.5, -2,  4.5, 2.5, 0.2,  0.5, 0.15, 0.15); // 右半邊牆
+        
 
         // --- 4. 🎤 主舞台 (Stage) ---
         // 舞台底座 (稍高一點的木板)
@@ -157,27 +268,43 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix, 0, 3, -34.5,  8.5, 4, 0.2,   0.1, 0.1, 0.1);
 
         // --- 5. 🦊 海盜灣 (Pirate Cove - 左上角) ---
-        // 由於方塊很難畫圓形，我們先用紫色的布幕牆圍出一個區域
-        this.drawBlock(projMatrix, viewMatrix, -9, 0.5, -18,  2.5, 0.5, 2.5,  0.2, 0.1, 0.3); // 底座
-        this.drawBlock(projMatrix, viewMatrix, -9, 3, -16,  2.5, 2, 0.2,    0.3, 0.1, 0.4); // 紫色布幕
+        // 舞台底座 (現在是真的圓形了！半徑由 sx 和 sz 決定)
+        this.drawCylinder(projMatrix, viewMatrix, -18, 0.5, -18,  3.0, 0.5, 3.0,  0.2, 0.1, 0.3);
+        
+        // 舞台布幕 (使用原本的 drawBlock 來做一個背板)
+        this.drawBlock(projMatrix, viewMatrix, -18, 2, -21,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
+        this.drawBlock(projMatrix, viewMatrix, -21.5, 2, -18,  0.2, 2.5, 3.5,   0.3, 0.1, 0.4);
+        this.drawBlock(projMatrix, viewMatrix, -18, 2, -15,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
 
         // --- 6. 🔦 連接走廊 (Corridors) ---
+
+        // 區隔用餐區與警衛室走廊的南邊牆壁 (Z = -2)
+        this.drawBlock(projMatrix, viewMatrix, -11, 2.5, 2,  8, 2.5, 0.2,  0.5, 0.15, 0.15); // 左半邊牆
+        this.drawBlock(projMatrix, viewMatrix,  14, 2.5, 2,  11, 2.5, 0.2,  0.5, 0.15, 0.15); // 右半邊牆
+        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, -4.5,  10, 2.5, 0.2,  0.5, 0.15, 0.15); // 中間牆
+        
         // 正前方走廊 (連接 Door 1 到用餐區)
-        this.drawBlock(projMatrix, viewMatrix, -3.2, 2.5, 0,  0.2, 2.3, 2,   0.5, 0.15, 0.15); // 左側牆壁
-        this.drawBlock(projMatrix, viewMatrix,  3.2, 2.5, 0,  0.2, 2.3, 2,   0.5, 0.15, 0.15); // 右側牆壁
+        this.drawBlock(projMatrix, viewMatrix, -3.2, 2.5, 5,  0.2, 2.5, 3,   0.5, 0.15, 0.15); // 左側牆壁
+        this.drawBlock(projMatrix, viewMatrix,  3.2, 2.5, 5,  0.2, 2.5, 3,   0.5, 0.15, 0.15); // 右側牆壁
 
         // 左側走廊 (連接 Door 2 到左邊盡頭)
-        this.drawBlock(projMatrix, viewMatrix, -8, 2.5, 3,  4, 2.5, 0.2,   0.5, 0.15, 0.15); // 北側牆
-        this.drawBlock(projMatrix, viewMatrix, -8, 2.5, 6.5, 4, 2.5, 0.2,  0.5, 0.15, 0.15); // 南側牆 (防穿幫)
+        this.drawBlock(projMatrix, viewMatrix, -11, 2.5, 9, 7, 2.5, 0.2,  0.5, 0.15, 0.15); // 南側牆 (防穿幫)
 
-        // --- 7. 🐀 右側房間與通風管 (Vent System) ---
-        // 隔出右邊的幾個小房間
-        this.drawBlock(projMatrix, viewMatrix, 10, 2.5, -12,  2, 2.5, 0.2,   0.5, 0.15, 0.15);
-        this.drawBlock(projMatrix, viewMatrix, 10, 2.5, -4,   2, 2.5, 0.2,   0.5, 0.15, 0.15);
-        
-        // 懸空的銀色通風管！從右側走廊連進警衛室 (Y=3 代表在頭頂附近)
-        this.drawBlock(projMatrix, viewMatrix, 10.5, 3, 1,  0.4, 0.4, 5,   0.6, 0.6, 0.6); // 垂直向下的管子
-        this.drawBlock(projMatrix, viewMatrix, 7, 3, 5.5,  3.5, 0.4, 0.4,  0.6, 0.6, 0.6); // 橫向轉進警衛室的管子
+        // 左側走廊 房間
+        this.drawBlock(projMatrix, viewMatrix, -5.5, 2.5, 5.5,  0.2, 2.5, 3.5,   0.5, 0.15, 0.15); // 房底牆壁
+        this.drawBlock(projMatrix, viewMatrix, -17.8, 2.5, 7.5,  0.2, 2.5, 1.5,   0.5, 0.15, 0.15); // 左側牆壁
+        this.drawBlock(projMatrix, viewMatrix, -17.8, 2.5, 2.8,  0.2, 2.5, 0.75,   0.5, 0.15, 0.15); // 左側牆壁
+
+        // 左側走廊 房間
+        this.drawBlock(projMatrix, viewMatrix,  14, 2.5, 2,  11, 2.5, 0.2,  0.5, 0.15, 0.15); // 右半邊牆
+        //通風管
+        this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 10,  11, 1.5, 0.2, 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  15, 3, 11.5,  11, 0.2 , 1.5 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 13,  11, 1.5, 0.2, 0.3, 0.3, 0.3);
+
+        this.drawBlock(projMatrix, viewMatrix, 26, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 27.5, 3, 15,  1.5, 0.2 , 25 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 29, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
     },
 
     // 🌟 蓋房子的積木函式：把原本 1x1 的方塊位移、縮放、上色
