@@ -1,13 +1,13 @@
 // game.js
 const GameState = {
     time: 0,
-    obMode: true, // 預設開啟 OB 模式，按 'O' 鍵可以切換
+    obMode: false, // 預設開啟 OB 模式，按 'O' 鍵可以切換
     
     // OB 攝影機狀態
     obCam: { x: 0, y: 15, z: 20, pitch: -30, yaw: 0 }, 
     
     // 紀錄鍵盤按下的狀態
-    keys: { w: false, a: false, s: false, d: false, q: false, e: false } 
+    keys: { w: false, a: false, s: false, d: false, Space: false, shift: false } 
 };
 
 let isDragging = false;
@@ -25,6 +25,7 @@ function setupInput() {
     // 鍵盤按下與放開事件
     window.addEventListener('keydown', (ev) => {
         let k = ev.key.toLowerCase();
+        if (k === ' ') k = 'Space';  // 將空格鍵映射到 'Space'
         if (GameState.keys.hasOwnProperty(k)) GameState.keys[k] = true;
         if (k === 'o') {
             GameState.obMode = !GameState.obMode; // 切換 OB 模式
@@ -34,6 +35,7 @@ function setupInput() {
 
     window.addEventListener('keyup', (ev) => {
         let k = ev.key.toLowerCase();
+        if (k === ' ') k = 'Space';  // 將空格鍵映射到 'Space'
         if (GameState.keys.hasOwnProperty(k)) GameState.keys[k] = false;
     });
 
@@ -82,9 +84,9 @@ function updateLogic() {
         if (GameState.keys.a) { GameState.obCam.x -= rightX * speed; GameState.obCam.z -= rightZ * speed; }
         if (GameState.keys.d) { GameState.obCam.x += rightX * speed; GameState.obCam.z += rightZ * speed; }
         
-        // Q 鍵下降，E 鍵上升
-        if (GameState.keys.e) { GameState.obCam.y += speed; }
-        if (GameState.keys.q) { GameState.obCam.y -= speed; }
+        // Space 鍵下降，Shift 鍵上升
+        if (GameState.keys.Space) { GameState.obCam.y += speed; }
+        if (GameState.keys.shift) { GameState.obCam.y -= speed; }
     }
 }
 
