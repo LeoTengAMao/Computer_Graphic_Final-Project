@@ -260,8 +260,9 @@ const Renderer = {
         
         //DJ Table 
 
-        this.drawBlock(projMatrix, viewMatrix, 12, 1, -16,  2.0 , 0.1, 5,   1, 0.5, 1); // 最左桌
-        
+        this.drawBlock(projMatrix, viewMatrix, 18, 2, -16,  2.0 , 0.1, 5,   1, 0.5, 1); // DJ桌
+        this.drawBlock(projMatrix, viewMatrix, 18, 1, -16,  1 , 1, 1,    1, 0.5, 1);
+
 
         // --- 4. 🎤 主舞台 (Stage) ---
         // 舞台底座 (稍高一點的木板)
