@@ -258,7 +258,9 @@ const Renderer = {
         
         this.drawBlock(projMatrix, viewMatrix, 7.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
         
+        //DJ Table 
 
+        this.drawBlock(projMatrix, viewMatrix, 12, 1, -16,  2.0 , 0.1, 5,   1, 0.5, 1); // 最左桌
         
 
         // --- 4. 🎤 主舞台 (Stage) ---
@@ -303,7 +305,7 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 13,  11, 1.5, 0.2, 0.3, 0.3, 0.3);
 
         this.drawBlock(projMatrix, viewMatrix, 26, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
-        this.drawBlock(projMatrix, viewMatrix, 27.5, 3, 15,  1.5, 0.2 , 25 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 27.5, 3, -10,  1.5, 0.2 , 25 , 0.3, 0.3, 0.3); 
         this.drawBlock(projMatrix, viewMatrix, 29, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
     },
 
