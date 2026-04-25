@@ -167,6 +167,22 @@ const Renderer = {
                 gameState.obCam.x + fX, gameState.obCam.y + fY, gameState.obCam.z + fZ,
                 0, 1, 0
             );
+        } else if (gameState.isMonitorOpen && gameState.power > 0) {
+            // 📺 監視器模式：根據選擇的鏡頭，把攝影機掛在天花板角落往下看
+            switch (gameState.currentCam) {
+                case 'cam1': // 主舞台 (從右前方往左下看舞台)
+                    viewMatrix.setLookAt(8, 6, -18,  0, 2, -22,  0, 1, 0);
+                    break;
+                case 'cam2': // 用餐區 (從後面往前面長桌看)
+                    viewMatrix.setLookAt(-8, 6, -3,  0, 1, -12,  0, 1, 0);
+                    break;
+                case 'cam3': // 海盜灣 (由上往下特寫)
+                    viewMatrix.setLookAt(-5, 6, -15,  -9, 1, -18,  0, 1, 0);
+                    break;
+                case 'cam4': // 右側走廊通風管
+                    viewMatrix.setLookAt(8, 5, -5,  10, 2, 2,  0, 1, 0);
+                    break;
+            }
         } else {
             // 原本的保安視角 (鎖定在警衛室)
             // setLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
@@ -302,12 +318,22 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix,  14, 2.5, 2,  11, 2.5, 0.2,  0.5, 0.15, 0.15); // 右半邊牆
         //通風管
         this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 10,  11, 1.5, 0.2, 0.3, 0.3, 0.3); 
-        this.drawBlock(projMatrix, viewMatrix,  15, 3, 11.5,  11, 0.2 , 1.5 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  15, 3, 11.5,  11, 0.2 , 1.5 , 0.3, 0.3, 0.3); //橫的
         this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 13,  11, 1.5, 0.2, 0.3, 0.3, 0.3);
+
+        this.drawBlock(projMatrix, viewMatrix,  25, 1.5, -14,  2, 1.5, 0.2, 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  25, 3, -12.5,  2, 0.2 , 1.5 , 0.3, 0.3, 0.3); //橫的
+        this.drawBlock(projMatrix, viewMatrix,  25, 1.5, -11,  2, 1.5, 0.2, 0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 24, 1.5, -12.5,  0.1, 1.3 , 1.3 , 0, 0, 0); 
 
         this.drawBlock(projMatrix, viewMatrix, 26, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
         this.drawBlock(projMatrix, viewMatrix, 27.5, 3, -10,  1.5, 0.2 , 25 , 0.3, 0.3, 0.3); 
         this.drawBlock(projMatrix, viewMatrix, 29, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
+
+        this.drawBlock(projMatrix, viewMatrix, 11, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 12.5, 3, 5.5,  1.5, 0.2 , 4.5 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 14, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 12.5, 1.5, 1,  1.3, 1.3 , 0.1 , 0, 0, 0); 
     },
 
     // 🌟 蓋房子的積木函式：把原本 1x1 的方塊位移、縮放、上色
