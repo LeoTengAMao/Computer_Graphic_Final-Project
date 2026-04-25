@@ -188,6 +188,12 @@ const Renderer = {
                 case 'cam6': // 左邊走廊
                     viewMatrix.setLookAt(-5, 3, 12 ,  -23, 2, 9,  0, 1, 0);
                 break;
+                case 'cam7': // 左邊小防間
+                    viewMatrix.setLookAt(-8, 4.5, 8 ,  -16, 1, 6,  0, 1, 0);
+                break;
+                case 'cam8': // 通風管道
+                    viewMatrix.setLookAt(27.5, 2, 14,  24, 3, -8.5,  0, 1, 0);
+                break;
             }
         } else {
             // 👮 警衛模式 (坐在椅子上)
