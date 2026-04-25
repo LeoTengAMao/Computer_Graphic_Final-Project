@@ -171,25 +171,42 @@ const Renderer = {
             // 📺 監視器模式：根據選擇的鏡頭，把攝影機掛在天花板角落往下看
             switch (gameState.currentCam) {
                 case 'cam1': // 主舞台 (從右前方往左下看舞台)
-                    viewMatrix.setLookAt(8, 6, -18,  0, 2, -22,  0, 1, 0);
+                    viewMatrix.setLookAt(8, 6, -18,  0, 2, -30,  0, 1, 0);
                     break;
                 case 'cam2': // 用餐區 (從後面往前面長桌看)
-                    viewMatrix.setLookAt(-8, 6, -3,  0, 1, -12,  0, 1, 0);
+                    viewMatrix.setLookAt(0, 6, -6,  0, 1, -12,  0, 1, 0);
                     break;
                 case 'cam3': // 海盜灣 (由上往下特寫)
-                    viewMatrix.setLookAt(-5, 6, -15,  -9, 1, -18,  0, 1, 0);
+                    viewMatrix.setLookAt(-6, 6, -15,  -12, 3, -16,  0, 1, 0);
                     break;
                 case 'cam4': // 右側走廊通風管
-                    viewMatrix.setLookAt(8, 5, -5,  10, 2, 2,  0, 1, 0);
+                    viewMatrix.setLookAt(8, 4, -4,  10, 2, 2,  0, 1, 0);
                     break;
+                case 'cam5': // DJ台
+                    viewMatrix.setLookAt(10, 8, -20,  18, 2,-16,  0, 1, 0);
+                break;
+                case 'cam6': // 左邊走廊
+                    viewMatrix.setLookAt(-5, 3, 12 ,  -23, 2, 9,  0, 1, 0);
+                break;
             }
         } else {
-            // 原本的保安視角 (鎖定在警衛室)
-            // setLookAt(eyeX, eyeY, eyeZ, centerX, centerY, centerZ, upX, upY, upZ)
-            // 眼睛位置：(0, 3, 5) - 在 Z=5 處，稍微抬高 Y=3
-            // 看向的點：(0, 2, 0) - 看向原點的 Y=2 高度
-            // 上向量：(0, 1, 0) - Y 軸向上，保持相機正向
-            viewMatrix.setLookAt(0, 2, 12.5,  0, 2, 0,  0, 1, 0); 
+            // 👮 警衛模式 (坐在椅子上)
+            let eyeX = 0, eyeY = 1.5, eyeZ = 12; // 警衛的座標 (你地圖 Z=12 的位置)
+            
+            // 將大腦算好的角度 (Degree) 轉換為弧度 (Radian)
+            let radian = gameState.guardYaw * Math.PI / 180;
+            
+            // 利用三角函數計算出目光的落點 (目標點 X 與 Z)
+            // 因為我們預設是看向 Z 軸負方向，所以 Z 是用 -cos，X 是用 -sin
+            let targetX = eyeX - Math.sin(radian);
+            let targetZ = eyeZ - Math.cos(radian);
+
+            // 設定攝影機
+            viewMatrix.setLookAt(
+                eyeX, eyeY, eyeZ,        // 眼睛位置
+                targetX, eyeY, targetZ,  // 看向的目標點
+                0, 1, 0                  // 頭頂朝上
+            );
         }
 
         // --- 開始捏地圖 (Blockout) ---

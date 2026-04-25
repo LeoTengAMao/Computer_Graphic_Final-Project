@@ -26,6 +26,23 @@
         <button id="btn-door-left" class="btn">Toggle Left Door</button>
         <button id="btn-light-left" class="btn">Toggle Left Light</button>
         <button id="btn-monitor" class="btn">Open Monitor</button>
+
+        <div id="power-display" style="position: absolute; top: 20px; left: 20px; font-size: 30px; font-weight: bold; color: #0f0;">
+            Power: 100%
+        </div>
+
+        <div id="camera-panel" style="display: none; position: absolute; right: 20px; bottom: 50px; background: rgba(0,0,0,0.7); padding: 15px; border: 2px solid white; border-radius: 10px; pointer-events: auto;">
+            <h3 style="margin: 0 0 10px 0; text-align: center;">Camera System</h3>
+            <button class="btn cam-btn" data-cam="cam1" style="position:relative; display:block; margin:10px 0; padding: 10px; width: 100%;">CAM 1 (主舞台)</button>
+            <button class="btn cam-btn" data-cam="cam2" style="position:relative; display:block; margin:10px 0; padding: 10px; width: 100%;">CAM 2 (用餐區)</button>
+            <button class="btn cam-btn" data-cam="cam3" style="position:relative; display:block; margin:10px 0; padding: 10px; width: 100%;">CAM 3 (海盜灣)</button>
+            <button class="btn cam-btn" data-cam="cam4" style="position:relative; display:block; margin:10px 0; padding: 10px; width: 100%;">CAM 4 (右側通風管)</button>
+            <button class="btn cam-btn" data-cam="cam5" style="position:relative; display:block; margin:10px 0; padding: 10px; width: 100%;">CAM 5 (DJ台)</button>
+            <button class="btn cam-btn" data-cam="cam6" style="position:relative; display:block; margin:10px 0; padding: 10px; width: 100%;">CAM 6 (左邊走廊)</button>
+            <button class="btn cam-btn" data-cam="cam7" style="position:relative; display:block; margin:10px 0; padding: 10px; width: 100%;">CAM 7 (左邊走廊)</button>
+        </div>
+
+        <div id="crt-effect" style="display: none; position: absolute; top:0; left:0; width:100%; height:100%; background: repeating-linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1) 2px, transparent 2px, transparent 4px); pointer-events: none;"></div>
     </div>
 
     <script src="cuon-matrix.js"></script> <script src="assets.js"></script>      
@@ -33,4 +50,3 @@
     <script src="game.js"></script>
 </body>
 </html>
-    
