@@ -143,6 +143,58 @@ const Renderer = {
         this.gl.drawElements(this.gl.TRIANGLES, this.cylinderBufferInfo.indexCount, this.gl.UNSIGNED_SHORT, 0);
     },
 
+        // WebGL.js 內部
+    loadTexture: function(url) {
+        let texture = this.gl.createTexture();
+        let image = new Image();
+        image.onload = () => {
+            this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
+            // 設定圖片如何縮放
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
+            console.log("Texture loaded: " + url);
+        };
+        image.src = url;
+        return texture;
+    },
+
+    drawModel: function(proj, view, modelMatrix, buffer, texture, count) {
+        const gl = this.gl;
+        gl.useProgram(this.program);
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        const FSIZE = Float32Array.BYTES_PER_ELEMENT;
+    
+        // --- A. 計算並傳入矩陣 (萬用的關鍵) ---
+        let mvpMatrix = new Matrix4();
+        mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
+        let normalMatrix = new Matrix4();
+        normalMatrix.setInverseOf(modelMatrix).transpose();
+    
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
+    
+        // --- B. 設定頂點屬性 (Stride=8 代表 Pos(3)+Norm(3)+UV(2)) ---
+        let a_Position = gl.getAttribLocation(this.program, 'a_Position');
+        gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, FSIZE * 8, 0);
+        gl.enableVertexAttribArray(a_Position);
+    
+        let a_Normal = gl.getAttribLocation(this.program, 'a_Normal');
+        gl.vertexAttribPointer(a_Normal, 3, gl.FLOAT, false, FSIZE * 8, FSIZE * 3);
+        gl.enableVertexAttribArray(a_Normal);
+    
+        let a_TexCoord = gl.getAttribLocation(this.program, 'a_TexCoord');
+        gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, FSIZE * 8, FSIZE * 6);
+        gl.enableVertexAttribArray(a_TexCoord);
+    
+        // --- C. 綁定貼圖 ---
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_Sampler'), 0);
+    
+        // --- D. 執行繪製 ---
+        gl.drawArrays(gl.TRIANGLES, 0, count);
+    },
+
     draw: function(gameState) {
         this.gl.clearColor(0.05, 0.05, 0.05, 1.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
@@ -429,7 +481,29 @@ const Renderer = {
             let shakeY = Math.cos(gameState.time * 70) * 0.5;
             this.drawBlock(projMatrix, viewMatrix, shakeX, 1.5 + shakeY, 9, 2, 3, 2, 1, 0, 0); 
         }
+        
 
+        // 在 draw 函數內的地圖代碼下方
+        if (this.freddyBuffer) {
+            let loc = gameState.freddy.location;
+            let fredMatrix = new Matrix4();
+
+            if (loc === 'cam1') {
+                fredMatrix.translate(-3, 0, -32); // 舞台座標
+                fredMatrix.rotate(180, 0, 1, 0);  // 轉向玩家
+                fredMatrix.scale(0.6, 0.6, 0.6);   // 調整比例
+            } else if (loc === 'door' && gameState.leftLightOn) {
+                fredMatrix.translate(-3.5, 0, 10.5); // 門口座標
+                fredMatrix.rotate(90, 0, 1, 0);
+                fredMatrix.scale(0.6, 0.6, 0.6);
+            }
+
+            // 只有在特定位置才畫出她
+            if (loc !== 'none') {
+                this.drawModel(projMatrix, viewMatrix, fredMatrix, 
+                            this.freddyBuffer, this.freddyTexture, this.freddyCount);
+            }
+        }
 
 
 

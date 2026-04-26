@@ -32,8 +32,43 @@ const GameState = {
         timer: 0,         
         moveInterval: 5,  
         path: ['cam1', 'cam2', 'cam4', 'door'] 
-    }
+    },
+    freddy: {
+        location: 'cam1',
+        timer: 0,
+        moveInterval: 8, // 讓 Freddy 稍微難捉摸一點
+        path: ['cam1', 'cam2', 'cam4', 'door']
+    },
 };
+
+async function loadOBJModel(url) {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("找不到模型：" + url);
+    const objText = await response.text();
+    
+    let pTemp = [], nTemp = [], tTemp = [];
+    let vertices = [];
+    const lines = objText.split('\n');
+    
+    for (let line of lines) {
+        let parts = line.trim().split(/\s+/);
+        if (parts[0] === 'v') pTemp.push(+parts[1], +parts[2], +parts[3]);
+        else if (parts[0] === 'vn') nTemp.push(+parts[1], +parts[2], +parts[3]);
+        else if (parts[0] === 'vt') tTemp.push(+parts[1], +parts[2]);
+        else if (parts[0] === 'f') {
+            for (let i = 1; i <= 3; i++) {
+                let subParts = parts[i].split('/');
+                let pIdx = (parseInt(subParts[0]) - 1) * 3;
+                let tIdx = (parseInt(subParts[1]) - 1) * 2;
+                let nIdx = (parseInt(subParts[2]) - 1) * 3;
+                vertices.push(pTemp[pIdx], pTemp[pIdx+1], pTemp[pIdx+2]);
+                vertices.push(nTemp[nIdx], nTemp[nIdx+1], nTemp[nIdx+2]);
+                vertices.push(tTemp[tIdx], 1.0 - tTemp[tIdx+1]);
+            }
+        }
+    }
+    return { data: new Float32Array(vertices), count: vertices.length / 8 };
+}
 
 let isDragging = false;
 let lastMouseX = 0;
@@ -270,9 +305,34 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-window.onload = () => {
+// ✅ 加上 async
+// game.js
+
+// game.js
+
+window.onload = async () => {
+    console.log("目前的 loadOBJModel 類型是:", typeof loadOBJModel);
     setupInput();
+    
     if (Renderer.init('webgl-canvas')) {
-        gameLoop();
+        try {
+            // 🌟 這裡就會去呼叫 assets.js 裡的函數
+            const modelData = await loadOBJModel('models/Freddy.obj'); 
+            
+            // 建立 WebGL Buffer
+            Renderer.freddyBuffer = Renderer.gl.createBuffer();
+            Renderer.gl.bindBuffer(Renderer.gl.ARRAY_BUFFER, Renderer.freddyBuffer);
+            Renderer.gl.bufferData(Renderer.gl.ARRAY_BUFFER, modelData.data, Renderer.gl.STATIC_DRAW);
+            Renderer.freddyCount = modelData.count;
+            
+            // 載入貼圖
+            Renderer.freddyTexture = Renderer.loadTexture('models/freddy_diffuse.png');
+
+            gameLoop();
+        } catch (error) {
+            console.error("載入失敗：", error);
+            // 就算模型載入失敗，也可以跑 gameLoop，只是看不到 Freddy
+            gameLoop(); 
+        }
     }
 };
