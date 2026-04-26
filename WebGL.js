@@ -2,28 +2,46 @@
 const Renderer = {
     gl: null, canvas: null, program: null, cubeBufferInfo: null, cylinderBufferInfo: null,
 
-    // Shader 增加一個 u_BaseColor，讓我們可以改變方塊顏色
+        // WebGL.js
+
     VSHADER_SOURCE: `
-        attribute vec4 a_Position;
-        attribute vec4 a_Normal;
-        uniform mat4 u_MvpMatrix;
-        uniform mat4 u_normalMatrix;
-        varying vec3 v_Normal;
-        void main() {
-            gl_Position = u_MvpMatrix * a_Position;
-            v_Normal = normalize(vec3(u_normalMatrix * a_Normal));
-        }
+    attribute vec4 a_Position;
+    attribute vec4 a_Normal;
+    attribute vec2 a_TexCoord; 
+    uniform mat4 u_MvpMatrix;
+    uniform mat4 u_normalMatrix;
+    varying vec3 v_Normal;
+    varying vec2 v_TexCoord;
+    void main() {
+        gl_Position = u_MvpMatrix * a_Position;
+        v_Normal = normalize(vec3(u_normalMatrix * a_Normal));
+        v_TexCoord = a_TexCoord;
+    }
     `,
+
+    // WebGL.js 裡的 FSHADER_SOURCE
     FSHADER_SOURCE: `
-        precision mediump float;
-        varying vec3 v_Normal;
-        uniform vec3 u_BaseColor; // 接收外部傳來的顏色
-        void main() {
-            vec3 lightDirection = normalize(vec3(0.5, 1.0, 1.0));
-            float nDotL = max(dot(v_Normal, lightDirection), 0.0);
-            vec3 finalColor = u_BaseColor * (nDotL * 0.7 + 0.3); // 0.3 是環境光底色
-            gl_FragColor = vec4(finalColor, 1.0);
+    precision mediump float;
+    varying vec3 v_Normal;
+    varying vec2 v_TexCoord;
+    uniform sampler2D u_Sampler;
+    uniform vec3 u_BaseColor;  // 之前的紅色 (1.0, 0.0, 0.0)
+    uniform bool u_UseTexture; // 開關
+    void main() {
+        vec3 light = normalize(vec3(0.5, 1.0, 1.0));
+        float nDotL = max(dot(v_Normal, light), 0.0);
+        
+        vec4 color;
+        if (u_UseTexture) {
+            // 🌟 如果開關打開，就只用圖片的顏色
+            color = texture2D(u_Sampler, v_TexCoord);
+        } else {
+            // 🌟 如果開關關閉（畫牆壁時），才用純紅色
+            color = vec4(u_BaseColor, 1.0);
         }
+        
+        gl_FragColor = vec4(color.rgb * (nDotL * 0.7 + 0.3), color.a);
+    }
     `,
 
     init: function(canvasId) {
@@ -186,10 +204,12 @@ const Renderer = {
         gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, FSIZE * 8, FSIZE * 6);
         gl.enableVertexAttribArray(a_TexCoord);
     
-        // --- C. 綁定貼圖 ---
-        gl.activeTexture(gl.TEXTURE0);
+      // --- C. 綁定貼圖 ---
+        gl.activeTexture(gl.TEXTURE0); // 使用 0 號單元
         gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.uniform1i(gl.getUniformLocation(this.program, 'u_Sampler'), 0);
+
+        // 🌟 修正點：這裡要填 0，代表對應到 TEXTURE0
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_UseTexture'), 1);
     
         // --- D. 執行繪製 ---
         gl.drawArrays(gl.TRIANGLES, 0, count);
@@ -489,9 +509,9 @@ const Renderer = {
             let fredMatrix = new Matrix4();
 
             if (loc === 'cam1') {
-                fredMatrix.translate(-3, 0, -32); // 舞台座標
-                fredMatrix.rotate(180, 0, 1, 0);  // 轉向玩家
-                fredMatrix.scale(0.6, 0.6, 0.6);   // 調整比例
+                fredMatrix.translate(6, 1, -32); // 舞台座標
+                fredMatrix.rotate(0, 0, 1, 0);  // 轉向玩家
+                fredMatrix.scale(1.8, 1.8, 1.8);   // 調整比例
             } else if (loc === 'door' && gameState.leftLightOn) {
                 fredMatrix.translate(-3.5, 0, 10.5); // 門口座標
                 fredMatrix.rotate(90, 0, 1, 0);
@@ -520,6 +540,19 @@ const Renderer = {
         
         let normalMatrix = new Matrix4();
         normalMatrix.setInverseOf(modelMatrix).transpose();
+
+        let gl = this.gl;
+        gl.useProgram(this.program);
+
+        // 🌟 核心修正：強制關閉貼圖開關
+        let u_UseTexture = gl.getUniformLocation(this.program, 'u_UseTexture');
+        gl.uniform1i(u_UseTexture, 0); // 0 代表 False，不使用貼圖
+
+        // 傳入原本牆壁該有的顏色
+        let u_BaseColor = gl.getUniformLocation(this.program, 'u_BaseColor');
+        gl.uniform3f(u_BaseColor, r, g, b);
+
+        
 
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
