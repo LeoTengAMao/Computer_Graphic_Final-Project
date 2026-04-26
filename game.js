@@ -18,7 +18,21 @@ const GameState = {
     isMonitorOpen: false,  // 監視器是否打開
     currentCam: 'cam1',    // 目前看哪台攝影機
     leftDoorClosed: false, // 左門
-    leftLightOn: false     // 左燈
+    leftLightOn: false,    // 左燈
+    leftDoorY: 5.0,
+    rightDoorClosed: false,
+    rightLightOn: false,
+    rightDoorY: 5.0, // 右門的物理高度
+    // 🌟 新增：專屬頻道的干擾系統
+    flickerTimer: 0,     
+    flickerCams: [],
+
+    bonnie: {
+        location: 'cam1', // 一開始在主舞台
+        timer: 0,         
+        moveInterval: 5,  
+        path: ['cam1', 'cam2', 'cam4', 'door'] 
+    }
 };
 
 let isDragging = false;
@@ -37,6 +51,16 @@ function setupInput() {
         updateUsage();
     }
 
+    // 🌟 2. 新增右側按鈕監聽
+    document.getElementById('btn-door-right').onclick = () => {
+        GameState.rightDoorClosed = !GameState.rightDoorClosed;
+        updateUsage();
+    };
+    document.getElementById('btn-light-right').onclick = () => {
+        GameState.rightLightOn = !GameState.rightLightOn;
+        updateUsage();
+    };
+
     // 📺 打開/關閉監視器
     document.getElementById('btn-monitor').onclick = () => {
         GameState.isMonitorOpen = !GameState.isMonitorOpen;
@@ -44,6 +68,10 @@ function setupInput() {
         // 控制 UI 顯示與隱藏
         document.getElementById('camera-panel').style.display = GameState.isMonitorOpen ? 'block' : 'none';
         document.getElementById('crt-effect').style.display = GameState.isMonitorOpen ? 'block' : 'none';
+        document.getElementById('btn-door-left').style.display = GameState.isMonitorOpen ? 'none' : 'block';
+        document.getElementById('btn-light-left').style.display = GameState.isMonitorOpen ? 'none' : 'block';
+        document.getElementById('btn-door-right').style.display = GameState.isMonitorOpen ? 'none' : 'block';
+        document.getElementById('btn-light-right').style.display = GameState.isMonitorOpen ? 'none' : 'block';
         document.getElementById('btn-monitor').innerText = GameState.isMonitorOpen ? '📺 放下監視器' : '📺 打開監視器';
         
         updateUsage();
@@ -112,14 +140,18 @@ function setupInput() {
             // 注意：因為 WebGL 座標系，向左看是 + 角度，所以加一個負號
             GameState.targetGuardYaw = -normalizedX * 85; 
         }
+
+        
     });
 }
 
 // 更新耗電等級
 function updateUsage() {
-    let usage = 1; // 基礎耗電
+    let usage = 1;
     if (GameState.leftDoorClosed) usage += 1;
     if (GameState.leftLightOn) usage += 1;
+    if (GameState.rightDoorClosed) usage += 1; // 🌟 加入計算
+    if (GameState.rightLightOn) usage += 1;   // 🌟 加入計算
     if (GameState.isMonitorOpen) usage += 1;
     GameState.usage = usage;
 }
@@ -131,6 +163,18 @@ function updateLogic() {
     GameState.time += 0.01;
     powertimer -= 1;
     GameState.guardYaw += (GameState.targetGuardYaw - GameState.guardYaw) * 0.01;
+
+    // 🌟 門的滑動物理動畫 (Lerp)
+    // 如果玩家想關門，目標高度就是 1.5 (剛好碰到地板)；如果想開門，目標就是 5.0 (藏進天花板)
+    let targetLeftY = GameState.leftDoorClosed ? 1.5 : 5.0;
+    GameState.leftDoorY += (targetLeftY - GameState.leftDoorY) * 0.2;
+
+    let targetRightY = GameState.rightDoorClosed ? 1.5 : 5.0; // 右門目標
+    GameState.rightDoorY += (targetRightY - GameState.rightDoorY) * 0.2;
+    
+    if (GameState.flickerTimer > 0) {
+        GameState.flickerTimer -= 0.01; 
+    }
 
     // 🔋 扣電邏輯
     if (GameState.power > 0 && powertimer ==0 ) {
@@ -156,6 +200,47 @@ function updateLogic() {
         document.getElementById('camera-panel').style.display = 'none';
         document.getElementById('crt-effect').style.display = 'none';
     }
+
+    // 🤖 怪物 AI 邏輯 (Bonnie)
+    if (GameState.power > 0) { 
+        GameState.bonnie.timer += 0.01; 
+
+        if (GameState.bonnie.timer >= GameState.bonnie.moveInterval) {
+            GameState.bonnie.timer = 0; // 重置計時
+
+            if (Math.random() > 0.4) {
+                // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+                let oldLocation = GameState.bonnie.location;
+                let currentIndex = GameState.bonnie.path.indexOf(oldLocation);
+                
+                if (currentIndex < GameState.bonnie.path.length - 1) {
+                    let newLocation = GameState.bonnie.path[currentIndex + 1];
+                    GameState.bonnie.location = newLocation;
+                    
+                    console.log(`⚠️ Bonnie 從 ${oldLocation} 移動到了 ${newLocation}`);
+                    
+                    // 🌟 4. 同時讓這兩台攝影機黑屏！
+                    GameState.flickerCams = [oldLocation, newLocation];
+                    GameState.flickerTimer = 1.5; 
+                } 
+                else if (GameState.bonnie.location === 'door') {
+                    if (GameState.leftDoorClosed) {
+                        console.log("🛡️ Bonnie 撞到門，退回去了！");
+                        GameState.bonnie.location = 'cam2';
+                        GameState.flickerCams = ['door', 'cam2'];
+                        GameState.flickerTimer = 1.5; 
+                    } else {
+                        console.log("💀 JUMPSCARE！");
+                        GameState.bonnie.location = 'jumpscare';
+                        GameState.power = 0; 
+                    }
+                }
+            }
+        }
+    }
+
+
+
 
     // OB 模式下的飛行控制
     if (GameState.obMode) {

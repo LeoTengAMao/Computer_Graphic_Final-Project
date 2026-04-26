@@ -144,8 +144,29 @@ const Renderer = {
     },
 
     draw: function(gameState) {
-        this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
+        this.gl.clearColor(0.05, 0.05, 0.05, 1.0);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+
+        // 🌟 終極版防護罩攔截器
+        // 1. 監視器打開中
+        // 2. 還在干擾時間內
+        // 3. 有電  
+        // 4. 目前看的這台攝影機，剛好包含在「壞掉名單(flickerCams)」裡面！
+        let isFlickering = gameState.isMonitorOpen && 
+                           gameState.flickerTimer > 0 && 
+                           gameState.power > 0 &&
+                           gameState.flickerCams.includes(gameState.currentCam);
+
+        if (isFlickering) {
+            // 把背景塗成純黑色 (模擬斷訊)
+            this.gl.clearColor(0.0, 0.0, 0.0, 1.0); 
+            this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+            
+            // 🌟 直接 return，不把地圖畫出來！
+            return; 
+        }
+
+
 
         let projMatrix = new Matrix4();
         let viewMatrix = new Matrix4();
@@ -243,6 +264,8 @@ const Renderer = {
         // Door 1 右邊的牆
         this.drawBlock(projMatrix, viewMatrix, 3.5, 2.5, 8,  0.5, 2.5, 0.2,  0.2, 0.3, 0.3); 
 
+        this.drawBlock(projMatrix, viewMatrix, 2, gameState.rightDoorY, 8, 1.25 ,2 , 0.15,  0.2, 0.25, 0.3);
+
         // 4. 🛡️ 左邊牆壁 (包含 Door 2) - X=-4
         // 門前方的牆
         this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 9,  0.2, 2.5, 1,  0.2, 0.3, 0.3);
@@ -250,6 +273,14 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 13.0, 0.2, 2.5, 1.0, 0.2, 0.3, 0.3);
         // Door 2 的門樑
         this.drawBlock(projMatrix, viewMatrix, -4, 4, 11.25,  0.2, 1, 1.3, 0.2, 0.3, 0.3);
+
+        // ==========================================
+        // 🚪 繪製左邊的金屬防護門 (會上下滑動)
+        // ==========================================
+        // X = -4 (緊貼左牆), Y = 大腦算出來的高度, Z = 11.25 (剛好在門洞的正中間)
+        // Sx = 0.15 (薄薄的一片金屬), Sy = 1.5 (總高3), Sz = 1.1 (寬度剛好塞滿門洞)
+        // 顏色使用偏藍的深灰色 (0.2, 0.25, 0.3) 來模擬金屬材質
+        this.drawBlock(projMatrix, viewMatrix, -4, gameState.leftDoorY, 11.25,  0.15, 1.5, 1.1,  0.2, 0.25, 0.3);
 
         // 5. 🛡️ 右邊牆壁 (包含 Vent 通風管) - X=4
         this.drawBlock(projMatrix, viewMatrix, 4, 2.5, 11,  0.2, 2.5, 3,  0.2, 0.3, 0.3); // 右邊主牆
@@ -357,6 +388,51 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix, 12.5, 3, 5.5,  1.5, 0.2 , 4.5 , 0.3, 0.3, 0.3); 
         this.drawBlock(projMatrix, viewMatrix, 14, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
         this.drawBlock(projMatrix, viewMatrix, 12.5, 1.5, 1,  1.3, 1.3 , 0.1 , 0, 0, 0); 
+
+
+
+
+
+        // ==========================================
+        // 🤖 繪製怪物 (Bonnie) - 真實 3D 空間實體版
+        // ==========================================
+        let bLoc = gameState.bonnie.location;
+        
+        // 我們給 Bonnie 一個稍微高一點的方塊 (高4，寬1.6)，看起來比較像站著的機器人
+        let bScaleX = 0.8, bScaleY = 2.0, bScaleZ = 0.8; 
+        let bColorR = 0.8, bColorG = 0.1, bColorB = 0.2; // 恐怖的紅色
+
+        // 🌟 怪物永遠在場上！根據她現在的位置直接畫出來
+        if (bLoc === 'cam1') {
+            // 在舞台上 (稍微靠左邊一點)
+            this.drawBlock(projMatrix, viewMatrix, -3, 2, -30, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
+        } 
+        else if (bLoc === 'cam2') {
+            // 在用餐區長桌旁
+            this.drawBlock(projMatrix, viewMatrix, -5, 2, -15, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
+        } 
+        else if (bLoc === 'cam4') {
+            // 在右側走廊 / 通風管入口附近
+            this.drawBlock(projMatrix, viewMatrix, 8, 2, 2, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
+        } 
+        else if (bLoc === 'door') {
+            // 🚨 關鍵：她已經走到門邊了！
+            // 但因為走廊很暗，我們設定「只有玩家開燈時，才把她畫出來」
+            if (gameState.leftLightOn) {
+                // 畫在左邊門口的窗外
+                this.drawBlock(projMatrix, viewMatrix, -3.5, 2, 10.5, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
+            }
+        } 
+        else if (bLoc === 'jumpscare') {
+            // 💀 突發驚嚇！無視物理空間，直接畫在攝影機(玩家)的正前方！
+            let shakeX = Math.sin(gameState.time * 50) * 0.5;
+            let shakeY = Math.cos(gameState.time * 70) * 0.5;
+            this.drawBlock(projMatrix, viewMatrix, shakeX, 1.5 + shakeY, 9, 2, 3, 2, 1, 0, 0); 
+        }
+
+
+
+
     },
 
     // 🌟 蓋房子的積木函式：把原本 1x1 的方塊位移、縮放、上色
