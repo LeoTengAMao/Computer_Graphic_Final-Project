@@ -41,34 +41,67 @@ const GameState = {
     },
 };
 
+const FREDDY_MATERIALS = {
+    "Endo1": "models/Endo1_baseColor.png",
+    "Endo2": "models/Hat_Bowtie_baseColor.png",
+    "Eyebrows_Freckles": "models/Hat_Bowtie_baseColor.png",
+    "Hat_Bowtie": "models/Hat_Bowtie_baseColor.png",
+    "Mic_Black": "models/Hat_Bowtie_baseColor.png",
+    "Nose": "models/Hat_Bowtie_baseColor.png",
+    "Suit_1": "models/Suit_1_baseColor.png",
+    "Suit_1_HEAD": "models/Suit_1_baseColor.png",
+    "Suit_1_JAW": "models/Suit_1_baseColor.png",
+    "Suit_2": "models/Suit_2_baseColor.png",
+    "Suit_2_HEAD": "models/Suit_2_baseColor.png",
+    "Teeths": "models/Teeths_baseColor.png",
+    "Wire": "models/Wire_baseColor.png",
+    "material": "models/material_baseColor.png",
+    "material_13": "models/material_13_baseColor.png"
+};
+
+// game.js 裡的 loadOBJModel
 async function loadOBJModel(url) {
     const response = await fetch(url);
-    if (!response.ok) throw new Error("找不到模型：" + url);
-    const objText = await response.text();
+    const text = await response.text();
     
-    let pTemp = [], nTemp = [], tTemp = [];
-    let vertices = [];
-    const lines = objText.split('\n');
-    
+    let pTemp = [], tTemp = [], nTemp = [];
+    let groups = {}; // 🌟 用來存放不同材質的分組
+    let currentMaterial = "default";
+
+    const lines = text.split('\n');
     for (let line of lines) {
-        let parts = line.trim().split(/\s+/);
+        const parts = line.trim().split(/\s+/);
         if (parts[0] === 'v') pTemp.push(+parts[1], +parts[2], +parts[3]);
-        else if (parts[0] === 'vn') nTemp.push(+parts[1], +parts[2], +parts[3]);
         else if (parts[0] === 'vt') tTemp.push(+parts[1], +parts[2]);
-        else if (parts[0] === 'f') {
+        else if (parts[0] === 'vn') nTemp.push(+parts[1], +parts[2], +parts[3]);
+        else if (parts[0] === 'usemtl') { 
+            // 🌟 當看到 usemtl 時，切換目前的材質分組
+            currentMaterial = parts[1];
+            if (!groups[currentMaterial]) groups[currentMaterial] = [];
+        }
+        else if (parts[0] === 'f' && parts.length >= 4) {
+            if (!groups[currentMaterial]) groups[currentMaterial] = [];
             for (let i = 1; i <= 3; i++) {
-                let subParts = parts[i].split('/');
-                let pIdx = (parseInt(subParts[0]) - 1) * 3;
-                let tIdx = (parseInt(subParts[1]) - 1) * 2;
-                let nIdx = (parseInt(subParts[2]) - 1) * 3;
-                vertices.push(pTemp[pIdx], pTemp[pIdx+1], pTemp[pIdx+2]);
-                vertices.push(nTemp[nIdx], nTemp[nIdx+1], nTemp[nIdx+2]);
-                vertices.push(tTemp[tIdx], 1.0 - tTemp[tIdx+1]);
+                const [pi, ti, ni] = parts[i].split('/').map(num => parseInt(num) - 1);
+                groups[currentMaterial].push(pTemp[pi*3], pTemp[pi*3+1], pTemp[pi*3+2]);
+                groups[currentMaterial].push(nTemp[ni*3], nTemp[ni*3+1], nTemp[ni*3+2]);
+                groups[currentMaterial].push(tTemp[ti*2], 1.0 - tTemp[ti*2+1]);
             }
         }
     }
-    return { data: new Float32Array(vertices), count: vertices.length / 8 };
+
+    // 將分組資料轉為 WebGL 可用的格式
+    let result = [];
+    for (let mtlName in groups) {
+        result.push({
+            materialName: mtlName,
+            data: new Float32Array(groups[mtlName]),
+            count: groups[mtlName].length / 8
+        });
+    }
+    return result; // 現在回傳的是一個陣列，包含多個部位
 }
+
 
 let isDragging = false;
 let lastMouseX = 0;
@@ -305,34 +338,37 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-// ✅ 加上 async
-// game.js
+
 
 // game.js
-
 window.onload = async () => {
-    console.log("目前的 loadOBJModel 類型是:", typeof loadOBJModel);
     setupInput();
     
     if (Renderer.init('webgl-canvas')) {
         try {
-            // 🌟 這裡就會去呼叫 assets.js 裡的函數
-            const modelData = await loadOBJModel('models/Freddy.obj'); 
+            // 1. 載入模型（會回傳多個零件分組）
+            const freddyParts = await loadOBJModel('models/Freddy.obj');
             
-            // 建立 WebGL Buffer
-            Renderer.freddyBuffer = Renderer.gl.createBuffer();
-            Renderer.gl.bindBuffer(Renderer.gl.ARRAY_BUFFER, Renderer.freddyBuffer);
-            Renderer.gl.bufferData(Renderer.gl.ARRAY_BUFFER, modelData.data, Renderer.gl.STATIC_DRAW);
-            Renderer.freddyCount = modelData.count;
-            
-            // 載入貼圖
-            Renderer.freddyTexture = Renderer.loadTexture('models/freddy_diffuse.png');
+            // 2. 為每個零件建立 Buffer 並配對貼圖
+            Renderer.freddyModel = freddyParts.map(part => {
+                const buffer = Renderer.gl.createBuffer();
+                Renderer.gl.bindBuffer(Renderer.gl.ARRAY_BUFFER, buffer);
+                Renderer.gl.bufferData(Renderer.gl.ARRAY_BUFFER, part.data, Renderer.gl.STATIC_DRAW);
+                
+                // 🌟 從對照表找出這份零件該用的貼圖路徑
+                let texturePath = FREDDY_MATERIALS[part.materialName] || "models/default.png";
+                
+                return {
+                    buffer: buffer,
+                    count: part.count,
+                    texture: Renderer.loadTexture(texturePath)
+                };
+            });
 
             gameLoop();
         } catch (error) {
-            console.error("載入失敗：", error);
-            // 就算模型載入失敗，也可以跑 gameLoop，只是看不到 Freddy
-            gameLoop(); 
+            console.error("Freddy 載入失敗：", error);
+            gameLoop();
         }
     }
 };
