@@ -59,6 +59,22 @@ const FREDDY_MATERIALS = {
     "material_13": "models/material_13_baseColor.png"
 };
 
+const BONNIE_MATERIALS = {
+    "Body": "models/Bonnie_Body.png",
+    "Guitar": "models/Bonnie_Guitar.png"
+    // ... 之後根據 Bonnie 的 .obj 來填寫
+};
+
+const CHICA_MATERIALS = {
+    "Body": "models/Chica_Body.png",
+    "Cupcake": "models/Cupcake.png"
+};
+
+const FOXY_MATERIALS = {
+    "Body": "models/Foxy_Body.png",
+    "Hook": "models/Foxy_Hook.png"
+};
+
 // game.js 裡的 loadOBJModel
 async function loadOBJModel(url) {
     const response = await fetch(url);
@@ -338,7 +354,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
-async function loadAndParseModel(objUrl) {
+async function loadAndParseModel(objUrl, materialDict) {
     const response = await fetch(objUrl);
     const text = await response.text();
     const obj = parseOBJ(text);
@@ -347,11 +363,15 @@ async function loadAndParseModel(objUrl) {
     for (let i = 0; i < obj.geometries.length; i++) {
         const geo = obj.geometries[i];
         let o = initVertexBufferForLaterUse(Renderer.gl, geo.data.position, geo.data.normal, geo.data.texcoord);
-        o.mtlName = geo.material;
+        
+        // 🌟 關鍵：直接把這塊零件專屬的「圖片路徑」存在身上！
+        o.texturePath = materialDict[geo.material] || "models/default.png";
         components.push(o);
         
-        let imgPath = FREDDY_MATERIALS[o.mtlName] || "models/default.png";
-        if (!Renderer.textures[imgPath]) Renderer.loadTexture(imgPath);
+        // 載入貼圖
+        if (!Renderer.textures[o.texturePath]) {
+            Renderer.loadTexture(o.texturePath);
+        }
     }
     return components;
 }
@@ -360,16 +380,25 @@ async function loadAndParseModel(objUrl) {
 
 window.onload = async () => {
     setupInput();
-    
     if (Renderer.init('webgl-canvas')) {
-        console.log("正在載入所有模型...");
+        console.log("正在載入所有機械玩偶模型...");
         
-        // 🌟 分別載入不同的姿勢，並存放在不同的變數裡
-        Renderer.freddyNormal = await loadAndParseModel('models/Freddy.obj'); // 站立姿
-        //Renderer.freddyAttack = await loadAndParseModel('models/Freddy_attack.obj'); // 攻擊姿 (假設你之後做了這個)
-        // Renderer.freddyWalk = await loadAndParseModel('models/Freddy_walk.obj'); 
+        // 🌟 傳入各自的 .obj 檔案，以及專屬的材質字典！
+        Renderer.models = {}; // 建一個物件來統整所有模型
         
-        console.log("模型載入完成，遊戲開始！");
+        // 載入 Freddy
+        Renderer.models.freddyNormal = await loadAndParseModel('models/Freddy.obj', FREDDY_MATERIALS);
+        
+        // 載入 Bonnie (註解掉，等你準備好檔案再打開)
+        // Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
+        
+        // 載入 Chica
+        // Renderer.models.chicaNormal = await loadAndParseModel('models/Chica.obj', CHICA_MATERIALS);
+        
+        // 載入 Foxy
+        // Renderer.models.foxyNormal = await loadAndParseModel('models/Foxy.obj', FOXY_MATERIALS);
+
+        console.log("所有模型載入完成，遊戲開始！");
         gameLoop();
     }
 };

@@ -184,8 +184,8 @@ const Renderer = {
 
     textures: {},
 
-    drawFreddy: function(proj, view, tx, ty, tz, sx, sy, sz, ry, components) {
-        // 🌟 修正 1：檢查傳進來的 components，而不是舊的 this.freddyComponents
+    // 🌟 改名為 drawCharacter，因為它現在什麼角色都能畫了！
+    drawCharacter: function(proj, view, tx, ty, tz, sx, sy, sz, ry, components) {
         if (!components) return; 
 
         // 1. 計算矩陣
@@ -203,11 +203,9 @@ const Renderer = {
         let gl = this.gl;
         gl.useProgram(this.program);
 
-        // 2. 傳入矩陣到 Shader
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
 
-        // 3. 取得變數的「門牌號碼」
         let a_Position = gl.getAttribLocation(this.program, 'a_Position');
         let a_Normal = gl.getAttribLocation(this.program, 'a_Normal');
         let a_TexCoord = gl.getAttribLocation(this.program, 'a_TexCoord');
@@ -215,23 +213,21 @@ const Renderer = {
         let u_UseTexture = gl.getUniformLocation(this.program, 'u_UseTexture');
 
         // 4. 迴圈畫出所有部位
-        // 🌟 修正 2：迴圈的長度要看傳進來的 components.length
         for (let i = 0; i < components.length; i++) {
             let comp = components[i];
-            let imgPath = FREDDY_MATERIALS[comp.mtlName] || "models/default.png";
             
-            // 綁定貼圖並開啟貼圖開關
+            // 🌟 終極修正：直接讀取載入時存好的 texturePath，不再依賴 FREDDY_MATERIALS！
+            let imgPath = comp.texturePath; 
+            
             gl.activeTexture(gl.TEXTURE0);
             gl.bindTexture(gl.TEXTURE_2D, this.textures[imgPath]);
             gl.uniform1i(u_Sampler, 0);
             gl.uniform1i(u_UseTexture, 1);
 
-            // 傳入 Buffer
             this.initAttributeVariable(a_Position, comp.vertexBuffer);
             this.initAttributeVariable(a_Normal, comp.normalBuffer);
             this.initAttributeVariable(a_TexCoord, comp.texCoordBuffer);
 
-            // 繪製零件
             gl.drawArrays(gl.TRIANGLES, 0, comp.numVertices);
         }
     },
@@ -566,23 +562,25 @@ const Renderer = {
         }
         
 
-        if (Renderer.freddyNormal) {
+        if (Renderer.models && Renderer.models.freddyNormal) {
             let loc = gameState.freddy.location;
-            let fredMatrix = new Matrix4(); // 用來算位置的矩陣
             
             // 決定要用哪一個模型！(預設為普通站姿)
-            let currentModel = this.freddyNormal; 
+            let currentModel = Renderer.models.freddyNormal; 
 
             if (loc === 'cam1') {
                 // 畫在舞台上
-                this.drawFreddy(projMatrix, viewMatrix, 6, 1, -32, 1.8, 1.8, 1.8, 0, currentModel); 
+                // 🌟 修正 2：使用 currentModel 變數
+                this.drawCharacter(projMatrix, viewMatrix, 6, 1, -32, 1.8, 1.8, 1.8, 0, currentModel); 
             } 
             else if (loc === 'door' && gameState.leftLightOn) {
                 // 🚪 假設走到門口時，換成「攻擊姿勢」的模型！
-                if (this.freddyAttack) {
-                    currentModel = this.freddyAttack;
+                if (Renderer.models.freddyAttack) {
+                    currentModel = Renderer.models.freddyAttack;
                 }
-                this.drawFreddy(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.6, 0.6, 0.6, 90, currentModel);
+                
+                // 🌟 修正 3：把座標改回門口！(你之前不小心複製到舞台的座標了)
+                this.drawCharacter(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.6, 0.6, 0.6, 90, currentModel);
             }
         }
 
