@@ -26,7 +26,7 @@ const GameState = {
     // 🌟 新增：專屬頻道的干擾系統
     flickerTimer: 0,     
     flickerCams: [],
-
+    gameStarted:false, // 遊戲是否開始了，還在讀取畫面中不能操作
     bonnie: {
         location: 'cam1', // 一開始在主舞台
         timer: 0,         
@@ -174,6 +174,8 @@ async function loadOBJModel(url) {
 let isDragging = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
+
+
 
 function setupInput() {
     // UI 按鈕監聽
@@ -349,7 +351,12 @@ function updateLogic() {
 
     // 停電了！
     if (GameState.power === 0 && GameState.leftDoorClosed) {
+        AudioManager.stop('fan');         // 電風扇停止！
+        AudioManager.stop('light');  // 如果有開燈，把燈光電流聲也切斷
+        AudioManager.stop('light2');  // 如果有開燈，把燈光電流聲也切斷
         console.log("停電！門強制打開！");
+        gameState.leftLightOn = false;
+        gameState.rightLightOn = false;
         GameState.leftDoorClosed = false;
         GameState.leftLightOn = false;
         GameState.isMonitorOpen = false;
@@ -453,41 +460,58 @@ async function loadAndParseModel(objUrl, materialDict) {
 
 
 window.onload = async () => {
-    setupInput();
-    if (Renderer.init('webgl-canvas')) {
-        console.log("正在載入所有機械玩偶模型...");
-        
-        // 🌟 傳入各自的 .obj 檔案，以及專屬的材質字典！
-        Renderer.models = {}; // 建一個物件來統整所有模型
-        
-        // 載入 Freddy
-        Renderer.models.freddyNormal = await loadAndParseModel('models/Freddy.obj', FREDDY_MATERIALS);
-        
-        // 載入 Bonnie (註解掉，等你準備好檔案再打開)
-        Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
-        Renderer.models.bonnieCam2 = await loadAndParseModel('models/Bonnie_cam2.obj', BONNIE_MATERIALS);
-        
-        // 載入 Chica
-        // Renderer.models.chicaNormal = await loadAndParseModel('models/Chica.obj', CHICA_MATERIALS);
-        
-        // 載入 Foxy
-        // Renderer.models.foxyNormal = await loadAndParseModel('models/Foxy.obj', FOXY_MATERIALS);
+  setupInput();
+  if (Renderer.init('webgl-canvas')) {
+      console.log("正在載入所有機械玩偶模型...");
+      Renderer.models = {}; 
 
-        console.log("所有模型載入完成，遊戲開始！");
+      try {
+          // 🌟 把它們包在 try 裡面
+          Renderer.models.freddyNormal = await loadAndParseModel('models/Freddy.obj', FREDDY_MATERIALS);
+          
+          // 🚨 這裡請確認你的實際路徑！
+          Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
+          Renderer.models.bonnieCam2 = await loadAndParseModel('models/Bonnie_cam2.obj', BONNIE_MATERIALS);
+          
+          // 載入音效 (你的 AudioManager 程式碼)
+          AudioManager.load('Jumpscare', 'sounds/Jumpscare.mp3', 1.0); 
+          AudioManager.load('cam', 'sounds/Changing_Camera.mp3', 1.0);
+          AudioManager.load('camup', 'sounds/Camara.mp3', 1.0); 
+          AudioManager.load('Vent', 'sounds/vent.mp3', 1.0); 
+          AudioManager.load('Fan', 'sounds/Fan.mp3', 0.3); 
+          AudioManager.load('PowerOFF', 'sounds/NoPower.mp3', 0.8); 
+          AudioManager.load('Dum', 'sounds/DumDumDum.mp3', 0.8);
+          AudioManager.load('Door', 'sounds/Door.mp3', 0.8);
+          AudioManager.load('FreddyLaugh', 'sounds/Freddy_Laugh.mp3', 0.8);
+          AudioManager.load('light', 'sounds/Light.mp3', 0.6); 
+          AudioManager.load('light2', 'sounds/Light.mp3', 0.6); 
+          AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.2); 
 
-        AudioManager.load('Jumpscare', 'sounds/Jumpscare.mp3', 1.0); // 背景音稍微小聲點
-        AudioManager.load('cam', 'sounds/Changing_Camera.mp3', 1.0);
-        AudioManager.load('camup', 'sounds/Camara.mp3', 1.0); 
-        AudioManager.load('Vent', 'sounds/vent.mp3', 1.0); 
-        AudioManager.load('Fan', 'sounds/Fan.mp3', 0.8); 
-        AudioManager.load('Dum', 'sounds/DumDumDum.mp3', 0.8);
-        AudioManager.load('Door', 'sounds/Door.mp3', 0.8);
-        AudioManager.load('FreddyLaugh', 'sounds/Freddy_Laugh.mp3', 0.8);
-        AudioManager.load('light', 'sounds/Light.mp3', 0.6); // 0.6 是音量
-        AudioManager.load('light2', 'sounds/Light.mp3', 0.6); // 0.6 是音量
-        AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.2); // 0.6 是音量
-        gameLoop();
-    }
+          console.log("所有模型與音效載入完成！");
+
+          // 成功載入才顯示按鈕
+          document.getElementById('loading-text').style.display = 'none';
+          let btnStart = document.getElementById('btn-start');
+          btnStart.style.display = 'block';
+
+          btnStart.addEventListener('click', () => {
+              document.getElementById('start-screen').style.display = 'none';
+              document.getElementById('ui-layer').style.display = 'block';
+              //gameState.gameStarted = true;
+              AudioManager.loop('Fan'); // 啟動風扇聲
+              gameLoop();
+          });
+
+      } catch (error) {
+          // 💀 如果載入失敗，會跑到這裡！
+          console.error("載入崩潰！詳細錯誤：", error);
+          
+          // 把錯誤訊息直接顯示在畫面上，方便除錯
+          let loadText = document.getElementById('loading-text');
+          loadText.innerHTML = "載入失敗！請按 F12 檢查檔案名稱是否打錯。<br><br>" + error.message;
+          loadText.style.color = "red";
+      }
+  }
 };
 
 function parseOBJ(text) {

@@ -7,10 +7,14 @@
         body { margin: 0; overflow: hidden; background-color: #000; color: white; font-family: sans-serif; }
         #webgl-canvas { width: 100vw; height: 100vh; display: block; }
         
-        /* 遊戲的 2D UI 疊層 */
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        /* 🌟 遊戲的 2D UI 疊層 (預設隱藏) */
+        #ui-layer { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            pointer-events: none; 
+            display: none; 
+        }
         
-        /* 互動按鈕：開啟 pointer-events 讓滑鼠可以點擊 */
+        /* 互動按鈕 */
         .btn { pointer-events: auto; position: absolute; padding: 15px 30px; font-size: 20px; cursor: pointer; background: rgba(255,255,255,0.2); color: white; border: 2px solid white; border-radius: 10px;}
         .btn:hover { background: rgba(255,255,255,0.5); }
 
@@ -19,10 +23,34 @@
         #btn-door-right { bottom: 15%; left: 36%; }
         #btn-light-right { bottom: 15%; left: 51%; }
         #btn-monitor { bottom: 5%; left: 50%; transform: translateX(-50%); width: 300px;}
+
+        /* 🌟 開始畫面的設計 */
+        #start-screen {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #000; /* 全黑背景 */
+            z-index: 100; /* 確保它在最上層 */
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        .title {
+            font-size: 60px; color: #fff; letter-spacing: 8px; text-shadow: 2px 2px 5px red; margin: 0;
+        }
+        .subtitle {
+            font-size: 20px; color: #aaa; letter-spacing: 2px;
+        }
+        
+        /* 讓按鈕一開始不能點，等載入完才能點 */
+        #btn-start { display: none; }
     </style>
 </head>
 <body>
     <canvas id="webgl-canvas"></canvas>
+
+    <div id="start-screen">
+        <h1 class="title">FIVE NIGHTS AT WEBGL</h1>
+        <p class="subtitle">Survive from 12 AM to 6 AM...</p>
+        <button id="btn-start" class="btn" style="font-size: 30px; margin-top: 50px; position: relative;">NEW GAME</button>
+        <p id="loading-text" style="color: gray; margin-top: 20px;">載入模型與音效中，請稍候...</p>
+    </div>
 
     <div id="ui-layer">
         <button id="btn-door-left" class="btn">Toggle Left Door</button>
