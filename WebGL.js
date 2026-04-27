@@ -234,45 +234,7 @@ const Renderer = {
 
 
 
-
-    drawModel: function(proj, view, modelMatrix, buffer, texture, count) {
-        const gl = this.gl;
-        gl.useProgram(this.program);
-        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        const FSIZE = Float32Array.BYTES_PER_ELEMENT;
     
-        // --- A. 計算並傳入矩陣 (萬用的關鍵) ---
-        let mvpMatrix = new Matrix4();
-        mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
-        let normalMatrix = new Matrix4();
-        normalMatrix.setInverseOf(modelMatrix).transpose();
-    
-        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
-        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
-    
-        // --- B. 設定頂點屬性 (Stride=8 代表 Pos(3)+Norm(3)+UV(2)) ---
-        let a_Position = gl.getAttribLocation(this.program, 'a_Position');
-        gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, FSIZE * 8, 0);
-        gl.enableVertexAttribArray(a_Position);
-    
-        let a_Normal = gl.getAttribLocation(this.program, 'a_Normal');
-        gl.vertexAttribPointer(a_Normal, 3, gl.FLOAT, false, FSIZE * 8, FSIZE * 3);
-        gl.enableVertexAttribArray(a_Normal);
-    
-        let a_TexCoord = gl.getAttribLocation(this.program, 'a_TexCoord');
-        gl.vertexAttribPointer(a_TexCoord, 2, gl.FLOAT, false, FSIZE * 8, FSIZE * 6);
-        gl.enableVertexAttribArray(a_TexCoord);
-    
-      // --- C. 綁定貼圖 ---
-        gl.activeTexture(gl.TEXTURE0); // 使用 0 號單元
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-
-        // 🌟 修正點：這裡要填 0，代表對應到 TEXTURE0
-        gl.uniform1i(gl.getUniformLocation(this.program, 'u_UseTexture'), 1);
-    
-        // --- D. 執行繪製 ---
-        gl.drawArrays(gl.TRIANGLES, 0, count);
-    },
 
     draw: function(gameState) {
         this.gl.clearColor(0.05, 0.05, 0.05, 1.0);
@@ -533,8 +495,8 @@ const Renderer = {
 
         // 🌟 防呆檢查：確定大腦 (game.js) 已經把 Bonnie 的模型載入完畢了
         if (Renderer.models && Renderer.models.bonnieNormal) {
-            //let bLoc = gameState.bonnie.location;
-            let bLoc = 'jumpscare';
+            let bLoc = gameState.bonnie.location;
+            //let bLoc = 'jumpscare';
             let currentBonnie = Renderer.models.bonnieNormal; // 預設使用普通站姿
             
             // 設定 Bonnie 在一般場景裡的大小 (請依據你的模型實際大小微調，這裡先預設跟 Freddy 一樣 1.8)

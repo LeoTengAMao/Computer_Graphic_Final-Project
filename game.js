@@ -41,6 +41,43 @@ const GameState = {
     },
 };
 
+const AudioManager = {
+  sounds: {}, // 存放所有載入的音效
+
+  // 1. 載入音效
+  load: function(name, url, volume = 1.0) {
+      let audio = new Audio(url);
+      audio.volume = volume; // 設定音量 (0.0 ~ 1.0)
+      this.sounds[name] = audio;
+  },
+
+  // 2. 播放一次 (例如：腳步聲、按鈕聲)
+  play: function(name) {
+    if (this.sounds[name]) {
+        // 🌟 關鍵：複製一份「影分身」來播放，才不會干擾原本正在播的
+        let soundClone = this.sounds[name].cloneNode();
+        soundClone.volume = this.sounds[name].volume; // 繼承原本設定的音量
+        soundClone.play().catch(e => console.warn("等待玩家點擊後才能播放音效", e));
+    }
+},
+
+  // 3. 循環播放 (例如：背景音樂、風扇聲)
+  loop: function(name) {
+      if (this.sounds[name]) {
+          this.sounds[name].loop = true;
+          this.sounds[name].play().catch(e => console.warn("等待玩家點擊後才能播放音效", e));
+      }
+  },
+
+  // 4. 停止播放
+  stop: function(name) {
+      if (this.sounds[name]) {
+          this.sounds[name].pause();
+          this.sounds[name].currentTime = 0;
+      }
+  }
+};
+
 const FREDDY_MATERIALS = {
     "Endo1": "models/Freddy/Endo1_baseColor.png",
     "Endo2": "models/Freddy/Hat_Bowtie_baseColor.png",
@@ -142,21 +179,37 @@ function setupInput() {
     // UI 按鈕監聽
     document.getElementById('btn-door-left').onclick = () => {
         GameState.leftDoorClosed = !GameState.leftDoorClosed;
+        AudioManager.play('Door'); // 播放開關門音效
         updateUsage(); // 開關門會影響耗電
     };
 
     document.getElementById('btn-light-left').onclick = () => {
         GameState.leftLightOn = !GameState.leftLightOn;
+        if (GameState.leftLightOn) {
+          // 如果燈是開的 👉 循環播放電流聲
+          AudioManager.loop('light2');
+      } else {
+          // 如果燈是關的 👉 停止播放電流聲
+          AudioManager.stop('light2');
+      }
         updateUsage();
     }
 
     // 🌟 2. 新增右側按鈕監聽
     document.getElementById('btn-door-right').onclick = () => {
         GameState.rightDoorClosed = !GameState.rightDoorClosed;
+        AudioManager.play('Door'); // 播放開關門音效
         updateUsage();
     };
     document.getElementById('btn-light-right').onclick = () => {
         GameState.rightLightOn = !GameState.rightLightOn;
+        if (GameState.rightLightOn) {
+          // 如果燈是開的 👉 循環播放電流聲
+          AudioManager.loop('light');
+      } else {
+          // 如果燈是關的 👉 停止播放電流聲
+          AudioManager.stop('light');
+      }
         updateUsage();
     };
 
@@ -172,6 +225,9 @@ function setupInput() {
         document.getElementById('btn-door-right').style.display = GameState.isMonitorOpen ? 'none' : 'block';
         document.getElementById('btn-light-right').style.display = GameState.isMonitorOpen ? 'none' : 'block';
         document.getElementById('btn-monitor').innerText = GameState.isMonitorOpen ? '📺 放下監視器' : '📺 打開監視器';
+        if(GameState.isMonitorOpen == true){
+          AudioManager.play('camup');
+        }
         
         updateUsage();
     };
@@ -181,6 +237,7 @@ function setupInput() {
     camBtns.forEach(btn => {
         btn.onclick = (ev) => {
             GameState.currentCam = ev.target.getAttribute('data-cam');
+            AudioManager.play('cam');
             console.log("切換到攝影機:", GameState.currentCam);
         };
     });
@@ -316,6 +373,7 @@ function updateLogic() {
                     let newLocation = GameState.bonnie.path[currentIndex + 1];
                     GameState.bonnie.location = newLocation;
                     
+                    if(GameState.bonnie.location == 'cam7')AudioManager.play('Foot'); // 播放腳步聲
                     console.log(`⚠️ Bonnie 從 ${oldLocation} 移動到了 ${newLocation}`);
                     
                     // 🌟 4. 同時讓這兩台攝影機黑屏！
@@ -329,6 +387,7 @@ function updateLogic() {
                         GameState.flickerCams = ['door', 'cam2'];
                         GameState.flickerTimer = 1.5; 
                     } else {
+                        AudioManager.play('Jumpscare');
                         console.log("💀 JUMPSCARE！");
                         GameState.bonnie.location = 'jumpscare';
                         GameState.power = 0; 
@@ -415,6 +474,18 @@ window.onload = async () => {
         // Renderer.models.foxyNormal = await loadAndParseModel('models/Foxy.obj', FOXY_MATERIALS);
 
         console.log("所有模型載入完成，遊戲開始！");
+
+        AudioManager.load('Jumpscare', 'sounds/Jumpscare.mp3', 1.0); // 背景音稍微小聲點
+        AudioManager.load('cam', 'sounds/Changing_Camera.mp3', 1.0);
+        AudioManager.load('camup', 'sounds/Camara.mp3', 1.0); 
+        AudioManager.load('Vent', 'sounds/vent.mp3', 1.0); 
+        AudioManager.load('Fan', 'sounds/Fan.mp3', 0.8); 
+        AudioManager.load('Dum', 'sounds/DumDumDum.mp3', 0.8);
+        AudioManager.load('Door', 'sounds/Door.mp3', 0.8);
+        AudioManager.load('FreddyLaugh', 'sounds/Freddy_Laugh.mp3', 0.8);
+        AudioManager.load('light', 'sounds/Light.mp3', 0.6); // 0.6 是音量
+        AudioManager.load('light2', 'sounds/Light.mp3', 0.6); // 0.6 是音量
+        AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.2); // 0.6 是音量
         gameLoop();
     }
 };
