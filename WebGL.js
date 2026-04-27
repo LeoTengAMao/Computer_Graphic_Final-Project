@@ -141,6 +141,9 @@ const Renderer = {
         let normalMatrix = new Matrix4();
         normalMatrix.setInverseOf(modelMatrix).transpose();
 
+        // 在 drawCylinder 裡面加上這行
+        this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_UseTexture'), 0);
+
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
         this.gl.uniform3f(this.gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b);
@@ -167,14 +170,72 @@ const Renderer = {
         let image = new Image();
         image.onload = () => {
             this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
-            // 設定圖片如何縮放
             this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
             this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
             console.log("Texture loaded: " + url);
         };
         image.src = url;
+        
+        // 🌟 核心修正：一定要把它存進字典裡，drawFreddy 才找得到！
+        this.textures[url] = texture; 
+        
         return texture;
     },
+
+    textures: {},
+
+    drawFreddy: function(proj, view, tx, ty, tz, sx, sy, sz, ry) {
+        if (!this.freddyComponents) return;
+
+        // 1. 計算矩陣
+        let modelMatrix = new Matrix4();
+        modelMatrix.translate(tx, ty, tz);
+        modelMatrix.rotate(ry, 0, 1, 0);
+        modelMatrix.scale(sx, sy, sz);
+
+        let mvpMatrix = new Matrix4();
+        mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
+        
+        let normalMatrix = new Matrix4();
+        normalMatrix.setInverseOf(modelMatrix).transpose();
+
+        let gl = this.gl;
+        gl.useProgram(this.program);
+
+        // 2. 傳入矩陣到 Shader
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
+
+        // 3. 取得變數的「門牌號碼」
+        let a_Position = gl.getAttribLocation(this.program, 'a_Position');
+        let a_Normal = gl.getAttribLocation(this.program, 'a_Normal');
+        let a_TexCoord = gl.getAttribLocation(this.program, 'a_TexCoord');
+        let u_Sampler = gl.getUniformLocation(this.program, 'u_Sampler');
+        let u_UseTexture = gl.getUniformLocation(this.program, 'u_UseTexture');
+
+        // 4. 迴圈畫出所有部位
+        for (let i = 0; i < this.freddyComponents.length; i++) {
+            let comp = this.freddyComponents[i];
+            let imgPath = FREDDY_MATERIALS[comp.mtlName] || "models/default.png";
+            
+            // 綁定貼圖並開啟貼圖開關
+            gl.activeTexture(gl.TEXTURE0);
+            gl.bindTexture(gl.TEXTURE_2D, this.textures[imgPath]);
+            gl.uniform1i(u_Sampler, 0);
+            gl.uniform1i(u_UseTexture, 1);
+
+            // 傳入 Buffer (注意這裡不再用 this.program.a_Position)
+            this.initAttributeVariable(a_Position, comp.vertexBuffer);
+            this.initAttributeVariable(a_Normal, comp.normalBuffer);
+            this.initAttributeVariable(a_TexCoord, comp.texCoordBuffer);
+
+            // 繪製零件
+            gl.drawArrays(gl.TRIANGLES, 0, comp.numVertices);
+        }
+    },
+
+
+
 
     drawModel: function(proj, view, modelMatrix, buffer, texture, count) {
         const gl = this.gl;
@@ -503,30 +564,27 @@ const Renderer = {
         }
         
 
-        // 在 draw 函數內的地圖代碼下方
-        if (this.freddyBuffer) {
+        if (this.freddyComponents) { // 🌟 改成檢查 freddyComponents
             let loc = gameState.freddy.location;
-            let fredMatrix = new Matrix4();
 
             if (loc === 'cam1') {
-                fredMatrix.translate(6, 1, -32); // 舞台座標
-                fredMatrix.rotate(0, 0, 1, 0);  // 轉向玩家
-                fredMatrix.scale(1.8, 1.8, 1.8);   // 調整比例
+                // 畫在舞台上 (x, y, z, scaleX, scaleY, scaleZ, rotateY)
+                this.drawFreddy(projMatrix, viewMatrix, 6, 1, -32, 1.8, 1.8, 1.8, 0); 
             } else if (loc === 'door' && gameState.leftLightOn) {
-                fredMatrix.translate(-3.5, 0, 10.5); // 門口座標
-                fredMatrix.rotate(90, 0, 1, 0);
-                fredMatrix.scale(0.6, 0.6, 0.6);
-            }
-
-            // 只有在特定位置才畫出她
-            if (loc !== 'none') {
-                this.drawModel(projMatrix, viewMatrix, fredMatrix, 
-                            this.freddyBuffer, this.freddyTexture, this.freddyCount);
+                // 畫在門口
+                this.drawFreddy(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.6, 0.6, 0.6, 90);
             }
         }
 
 
 
+    },
+
+
+    initAttributeVariable: function(a_attribute, buffer) {
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
+        this.gl.vertexAttribPointer(a_attribute, buffer.num, buffer.type, false, 0, 0);
+        this.gl.enableVertexAttribArray(a_attribute);
     },
 
     // 🌟 蓋房子的積木函式：把原本 1x1 的方塊位移、縮放、上色
