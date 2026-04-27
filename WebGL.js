@@ -27,6 +27,7 @@ const Renderer = {
     uniform sampler2D u_Sampler;
     uniform vec3 u_BaseColor;  // 之前的紅色 (1.0, 0.0, 0.0)
     uniform bool u_UseTexture; // 開關
+    uniform float u_Alpha;
     void main() {
         vec3 light = normalize(vec3(0.5, 1.0, 1.0));
         float nDotL = max(dot(v_Normal, light), 0.0);
@@ -50,6 +51,8 @@ const Renderer = {
         this.program = this.compileShader(this.VSHADER_SOURCE, this.FSHADER_SOURCE);
         this.gl.useProgram(this.program);
         this.gl.enable(this.gl.DEPTH_TEST);
+        this.gl.enable(this.gl.BLEND);
+        this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
         this.initCube();
         this.initCylinder();
         this.resizeCanvas();
@@ -183,6 +186,45 @@ const Renderer = {
     },
 
     textures: {},
+
+    // 🌟 專門為了電風扇發明的新技能：畫出會自轉的方塊！
+    drawRotatedBlock: function(proj, view, tx, ty, tz, sx, sy, sz, angle, r, g, b) {
+        let modelMatrix = new Matrix4();
+        modelMatrix.translate(tx, ty, tz);      // 3. 移動到桌上
+        modelMatrix.rotate(angle, 0, 0, 1);     // 2. 繞著自己的 Z 軸旋轉
+        modelMatrix.scale(sx, sy, sz);          // 1. 先縮放成葉片的形狀
+
+        let mvpMatrix = new Matrix4();
+        mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
+        
+        let normalMatrix = new Matrix4();
+        normalMatrix.setInverseOf(modelMatrix).transpose();
+
+        let gl = this.gl;
+        gl.useProgram(this.program);
+
+        // 關閉貼圖，設定顏色
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_UseTexture'), 0);
+        gl.uniform3f(gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b);
+
+        // 傳入矩陣
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
+
+        // 繪製方塊
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.cubeBufferInfo.vertexBuffer);
+        let a_Position = gl.getAttribLocation(this.program, 'a_Position');
+        gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Position);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.cubeBufferInfo.normalBuffer);
+        let a_Normal = gl.getAttribLocation(this.program, 'a_Normal');
+        gl.vertexAttribPointer(a_Normal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Normal);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.cubeBufferInfo.indexBuffer);
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_BYTE, 0);
+    },
 
     // 🌟 改名為 drawCharacter，因為它現在什麼角色都能畫了！
     drawCharacter: function(proj, view, tx, ty, tz, sx, sy, sz, ry, components) {
@@ -482,6 +524,25 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix, 14, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
         this.drawBlock(projMatrix, viewMatrix, 12.5, 1.5, 1,  1.3, 1.3 , 0.1 , 0, 0, 0); 
 
+        // ==========================================
+        // 📍 辦公室電風扇 (極簡旋轉版)
+        // ==========================================
+        let fX = 0.8, fY = 1.1, fZ = 10.1; 
+
+        // 1. 底盤與支柱 (靜態)
+        this.drawCylinder(projMatrix, viewMatrix, fX, fY, fZ, 0.15, 0.02, 0.15, 0.2, 0.2, 0.2);
+        this.drawCylinder(projMatrix, viewMatrix, fX, fY + 0.1, fZ, 0.02, 0.1, 0.02, 0.2, 0.2, 0.2);
+
+        // 2. 馬達頭 (靜態)
+        this.drawBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ, 0.08, 0.08, 0.1, 0.2, 0.2, 0.2);
+
+        // 🌟 3. 會旋轉的十字葉片！(使用新的 drawRotatedBlock，並傳入 gameState.fanAngle)
+        
+        // 垂直葉片 ( | 形狀 )
+        this.drawRotatedBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ + 0.11, 0.02, 0.15, 0.01, gameState.fanAngle, 0.05, 0.05, 0.05);
+        
+        // 水平葉片 ( - 形狀 )
+        this.drawRotatedBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ + 0.11, 0.15, 0.02, 0.01, gameState.fanAngle, 0.05, 0.05, 0.05);
 
 
 
@@ -546,9 +607,9 @@ const Renderer = {
         
 
         if (Renderer.models && Renderer.models.freddyNormal) {
-            //let loc = gameState.freddy.location;
+            let loc = gameState.freddy.location;
 
-            let loc = 'cam4';
+            //let loc = 'jumpscare';
             let fScale = 1.8;
             // 決定要用哪一個模型！(預設為普通站姿)
             let currentModel = Renderer.models.freddyNormal; 
@@ -568,12 +629,12 @@ const Renderer = {
                 currentModel = Renderer.models.freddyVent;
                 this.drawCharacter(projMatrix, viewMatrix, 27.5, 0, 6, 1.4, 1.4, 1.4, 0, currentModel); 
             }else if(loc === 'cam4'){
-                currentModel = Renderer.models.freddyNormal;
+                currentModel = Renderer.models.freddyOut;
                 this.drawCharacter(projMatrix, viewMatrix, 7, 0, 0, fScale, fScale, fScale, 180, currentModel); 
             }else if (loc === 'door' && gameState.leftLightOn) {
                 currentModel = Renderer.models.freddyAttack;
             }else if (loc === 'jumpscare') {
-                
+                currentModel = Renderer.models.freddyAttack;
                 
             
                 let shakeX = Math.sin(gameState.time * 50) * 0.1;

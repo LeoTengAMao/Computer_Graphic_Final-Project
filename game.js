@@ -2,10 +2,9 @@
 const GameState = {
     time: 0,
     obMode: false, // 預設開啟 OB 模式，按 'O' 鍵可以切換
-    
+    fanAngle:0,
     // OB 攝影機狀態
     obCam: { x: 0, y: 15, z: 20, pitch: -30, yaw: 0 }, 
-    
     // 紀錄鍵盤按下的狀態
     keys: { w: false, a: false, s: false, d: false, Space: false, shift: false }, // 🌟 修復1：這裡補上逗號了！
     
@@ -470,6 +469,16 @@ function updateLogic() {
 }
 
 function gameLoop() {
+
+  if (GameState.gameStarted && !GameState.isPowerOut) {
+    GameState.fanAngle -= 20; // 每一幀轉動 20 度
+    
+    // 保持角度在正常範圍
+    if (GameState.fanAngle <= -360) {
+        GameState.fanAngle += 360;
+    }
+  }
+
     updateLogic();
     Renderer.draw(GameState);
     requestAnimationFrame(gameLoop);
@@ -541,7 +550,7 @@ window.onload = async () => {
           btnStart.addEventListener('click', () => {
               document.getElementById('start-screen').style.display = 'none';
               document.getElementById('ui-layer').style.display = 'block';
-              //gameState.gameStarted = true;
+              GameState.gameStarted = true;
               AudioManager.loop('Fan'); // 啟動風扇聲
               gameLoop();
           });
