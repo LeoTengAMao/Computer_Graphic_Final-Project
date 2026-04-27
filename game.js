@@ -42,27 +42,42 @@ const GameState = {
 };
 
 const FREDDY_MATERIALS = {
-    "Endo1": "models/Endo1_baseColor.png",
-    "Endo2": "models/Hat_Bowtie_baseColor.png",
-    "Eyebrows_Freckles": "models/Hat_Bowtie_baseColor.png",
-    "Hat_Bowtie": "models/Hat_Bowtie_baseColor.png",
-    "Mic_Black": "models/Hat_Bowtie_baseColor.png",
-    "Nose": "models/Hat_Bowtie_baseColor.png",
-    "Suit_1": "models/Suit_1_baseColor.png",
-    "Suit_1_HEAD": "models/Suit_1_baseColor.png",
-    "Suit_1_JAW": "models/Suit_1_baseColor.png",
-    "Suit_2": "models/Suit_2_baseColor.png",
-    "Suit_2_HEAD": "models/Suit_2_baseColor.png",
-    "Teeths": "models/Teeths_baseColor.png",
-    "Wire": "models/Wire_baseColor.png",
-    "material": "models/material_baseColor.png",
-    "material_13": "models/material_13_baseColor.png"
+    "Endo1": "models/Freddy/Endo1_baseColor.png",
+    "Endo2": "models/Freddy/Hat_Bowtie_baseColor.png",
+    "Eyebrows_Freckles": "models/Freddy/Hat_Bowtie_baseColor.png",
+    "Hat_Bowtie": "models/Freddy/Hat_Bowtie_baseColor.png",
+    "Mic_Black": "models/Freddy/Hat_Bowtie_baseColor.png",
+    "Nose": "models/Freddy/Hat_Bowtie_baseColor.png",
+    "Suit_1": "models/Freddy/Suit_1_baseColor.png",
+    "Suit_1_HEAD": "models/Freddy/Suit_1_baseColor.png",
+    "Suit_1_JAW": "models/Freddy/Suit_1_baseColor.png",
+    "Suit_2": "models/Freddy/Suit_2_baseColor.png",
+    "Suit_2_HEAD": "models/Freddy/Suit_2_baseColor.png",
+    "Teeths": "models/Freddy/Teeths_baseColor.png",
+    "Wire": "models/Freddy/Wire_baseColor.png",
+    "material": "models/Freddy/material_baseColor.png",
+    "material_13": "models/Freddy/material_13_baseColor.png"
 };
 
 const BONNIE_MATERIALS = {
-    "Body": "models/Bonnie_Body.png",
-    "Guitar": "models/Bonnie_Guitar.png"
-    // ... 之後根據 Bonnie 的 .obj 來填寫
+  "Bowtie": "models/Bonnie/Bowtie_baseColor.png",
+  "Endo1.001": "models/Bonnie/Endo1.001_baseColor.png",
+  "Endo2.001": "models/Bonnie/Endo2.001_baseColor.png",
+  "EndoTeeth": "models/Bonnie/EndoTeeth_baseColor.png",
+  "Jaw_inner": "models/Bonnie/Jaw_inner_baseColor.png",
+  "Material.001": "models/Bonnie/Material.001_baseColor.png",
+  "Material.002": "models/Bonnie/Material.001_baseColor.png",
+  "Material.003": "models/Bonnie/Material.001_baseColor.png",
+  "Material.004": "models/Bonnie/Material.001_baseColor.png",
+  "Material.005": "models/Bonnie/Material.001_baseColor.png",
+  "Material.006": "models/Bonnie/Material.001_baseColor.png",
+  "Nose": "models/Bonnie/Nose_baseColor.png",
+  "Shadeless": "models/Bonnie/Shadeless_baseColor.png",
+  "Suit_Dark": "models/Bonnie/Suit_Dark_baseColor.png",
+  "Suit_Light": "models/Bonnie/Suit_Light_baseColor.png",
+  "Teeth": "models/Bonnie/Teeth_baseColor.png",
+  "Wire.001": "models/Bonnie/Wire.001_baseColor.png",
+  "material": "models/Bonnie/material_baseColor.png"
 };
 
 const CHICA_MATERIALS = {
@@ -390,7 +405,8 @@ window.onload = async () => {
         Renderer.models.freddyNormal = await loadAndParseModel('models/Freddy.obj', FREDDY_MATERIALS);
         
         // 載入 Bonnie (註解掉，等你準備好檔案再打開)
-        // Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
+        Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
+        Renderer.models.bonnieCam2 = await loadAndParseModel('models/Bonnie_cam2.obj', BONNIE_MATERIALS);
         
         // 載入 Chica
         // Renderer.models.chicaNormal = await loadAndParseModel('models/Chica.obj', CHICA_MATERIALS);

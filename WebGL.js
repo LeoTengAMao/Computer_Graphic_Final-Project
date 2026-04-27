@@ -530,35 +530,48 @@ const Renderer = {
         let bLoc = gameState.bonnie.location;
         
         // 我們給 Bonnie 一個稍微高一點的方塊 (高4，寬1.6)，看起來比較像站著的機器人
-        let bScaleX = 0.8, bScaleY = 2.0, bScaleZ = 0.8; 
-        let bColorR = 0.8, bColorG = 0.1, bColorB = 0.2; // 恐怖的紅色
 
-        // 🌟 怪物永遠在場上！根據她現在的位置直接畫出來
-        if (bLoc === 'cam1') {
-            // 在舞台上 (稍微靠左邊一點)
-            this.drawBlock(projMatrix, viewMatrix, -3, 2, -30, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
-        } 
-        else if (bLoc === 'cam2') {
-            // 在用餐區長桌旁
-            this.drawBlock(projMatrix, viewMatrix, -5, 2, -15, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
-        } 
-        else if (bLoc === 'cam4') {
-            // 在右側走廊 / 通風管入口附近
-            this.drawBlock(projMatrix, viewMatrix, 8, 2, 2, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
-        } 
-        else if (bLoc === 'door') {
-            // 🚨 關鍵：她已經走到門邊了！
-            // 但因為走廊很暗，我們設定「只有玩家開燈時，才把她畫出來」
-            if (gameState.leftLightOn) {
-                // 畫在左邊門口的窗外
-                this.drawBlock(projMatrix, viewMatrix, -3.5, 2, 10.5, bScaleX, bScaleY, bScaleZ, bColorR, bColorG, bColorB); 
+        // 🌟 防呆檢查：確定大腦 (game.js) 已經把 Bonnie 的模型載入完畢了
+        if (Renderer.models && Renderer.models.bonnieNormal) {
+            //let bLoc = gameState.bonnie.location;
+            let bLoc = 'cam2';
+            let currentBonnie = Renderer.models.bonnieNormal; // 預設使用普通站姿
+            
+            // 設定 Bonnie 在一般場景裡的大小 (請依據你的模型實際大小微調，這裡先預設跟 Freddy 一樣 1.8)
+            let bScale = 0.04; 
+
+            if (bLoc === 'cam1') {
+                // 🎸 在舞台上 (稍微靠左邊一點)
+                // 參數：投影, 視角, X, Y, Z, 縮放X, 縮放Y, 縮放Z, 旋轉Y角, 模型檔案
+                currentBonnie = Renderer.models.bonnieNormal;
+                this.drawCharacter(projMatrix, viewMatrix, -3, 1, -32, bScale, bScale, bScale, 0, currentBonnie); 
+            } 
+            else if (bLoc === 'cam2') {
+                // 🍕 在用餐區長桌旁 (稍微轉個 45 度角看著鏡頭會比較恐怖)
+                currentBonnie = Renderer.models.bonnieCam2;
+                this.drawCharacter(projMatrix, viewMatrix, 0, 1, -11, bScale, bScale, bScale, -30, currentBonnie); 
+            } 
+            else if (bLoc === 'cam4') {
+                // 🔦 在右側走廊 / 通風管入口附近
+                this.drawCharacter(projMatrix, viewMatrix, 8, 1, 2, bScale, bScale, bScale, -45, currentBonnie); 
+            } 
+            else if (bLoc === 'door') {
+                // 🚨 關鍵：她已經走到門邊了！只有玩家開燈時才畫出來
+                if (gameState.leftLightOn) {
+                    // 畫在左邊門口的窗外，旋轉 90 度讓她面向辦公室裡面
+                    // 這裡的縮放設定為 0.6，配合門口的大小
+                    this.drawCharacter(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.45, 0.45, 0.45, 90, currentBonnie); 
+                }
+            } 
+            else if (bLoc === 'jumpscare') {
+                // 💀 突發驚嚇！
+                // 利用原本的三角函數做出瘋狂抖動的效果
+                let shakeX = Math.sin(gameState.time * 50) * 0.5;
+                let shakeY = Math.cos(gameState.time * 70) * 0.5;
+                
+                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -0.5 + shakeY, 9, 0.45, 0.45, 0.45, 0, currentBonnie); 
             }
-        } 
-        else if (bLoc === 'jumpscare') {
-            // 💀 突發驚嚇！無視物理空間，直接畫在攝影機(玩家)的正前方！
-            let shakeX = Math.sin(gameState.time * 50) * 0.5;
-            let shakeY = Math.cos(gameState.time * 70) * 0.5;
-            this.drawBlock(projMatrix, viewMatrix, shakeX, 1.5 + shakeY, 9, 2, 3, 2, 1, 0, 0); 
         }
         
 
@@ -584,12 +597,13 @@ const Renderer = {
             }
         }
 
-
-
     },
 
 
     initAttributeVariable: function(a_attribute, buffer) {
+        // 🌟 終極防呆：如果這個零件沒有資料 (buffer 為 undefined)，就直接跳過，不報錯！
+        if (!buffer) return; 
+        
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
         this.gl.vertexAttribPointer(a_attribute, buffer.num, buffer.type, false, 0, 0);
         this.gl.enableVertexAttribArray(a_attribute);
