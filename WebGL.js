@@ -184,8 +184,9 @@ const Renderer = {
 
     textures: {},
 
-    drawFreddy: function(proj, view, tx, ty, tz, sx, sy, sz, ry) {
-        if (!this.freddyComponents) return;
+    drawFreddy: function(proj, view, tx, ty, tz, sx, sy, sz, ry, components) {
+        // 🌟 修正 1：檢查傳進來的 components，而不是舊的 this.freddyComponents
+        if (!components) return; 
 
         // 1. 計算矩陣
         let modelMatrix = new Matrix4();
@@ -214,8 +215,9 @@ const Renderer = {
         let u_UseTexture = gl.getUniformLocation(this.program, 'u_UseTexture');
 
         // 4. 迴圈畫出所有部位
-        for (let i = 0; i < this.freddyComponents.length; i++) {
-            let comp = this.freddyComponents[i];
+        // 🌟 修正 2：迴圈的長度要看傳進來的 components.length
+        for (let i = 0; i < components.length; i++) {
+            let comp = components[i];
             let imgPath = FREDDY_MATERIALS[comp.mtlName] || "models/default.png";
             
             // 綁定貼圖並開啟貼圖開關
@@ -224,7 +226,7 @@ const Renderer = {
             gl.uniform1i(u_Sampler, 0);
             gl.uniform1i(u_UseTexture, 1);
 
-            // 傳入 Buffer (注意這裡不再用 this.program.a_Position)
+            // 傳入 Buffer
             this.initAttributeVariable(a_Position, comp.vertexBuffer);
             this.initAttributeVariable(a_Normal, comp.normalBuffer);
             this.initAttributeVariable(a_TexCoord, comp.texCoordBuffer);
@@ -564,15 +566,23 @@ const Renderer = {
         }
         
 
-        if (this.freddyComponents) { // 🌟 改成檢查 freddyComponents
+        if (Renderer.freddyNormal) {
             let loc = gameState.freddy.location;
+            let fredMatrix = new Matrix4(); // 用來算位置的矩陣
+            
+            // 決定要用哪一個模型！(預設為普通站姿)
+            let currentModel = this.freddyNormal; 
 
             if (loc === 'cam1') {
-                // 畫在舞台上 (x, y, z, scaleX, scaleY, scaleZ, rotateY)
-                this.drawFreddy(projMatrix, viewMatrix, 6, 1, -32, 1.8, 1.8, 1.8, 0); 
-            } else if (loc === 'door' && gameState.leftLightOn) {
-                // 畫在門口
-                this.drawFreddy(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.6, 0.6, 0.6, 90);
+                // 畫在舞台上
+                this.drawFreddy(projMatrix, viewMatrix, 6, 1, -32, 1.8, 1.8, 1.8, 0, currentModel); 
+            } 
+            else if (loc === 'door' && gameState.leftLightOn) {
+                // 🚪 假設走到門口時，換成「攻擊姿勢」的模型！
+                if (this.freddyAttack) {
+                    currentModel = this.freddyAttack;
+                }
+                this.drawFreddy(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.6, 0.6, 0.6, 90, currentModel);
             }
         }
 

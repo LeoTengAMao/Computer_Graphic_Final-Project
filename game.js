@@ -338,46 +338,38 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+async function loadAndParseModel(objUrl) {
+    const response = await fetch(objUrl);
+    const text = await response.text();
+    const obj = parseOBJ(text);
+    let components = [];
+    
+    for (let i = 0; i < obj.geometries.length; i++) {
+        const geo = obj.geometries[i];
+        let o = initVertexBufferForLaterUse(Renderer.gl, geo.data.position, geo.data.normal, geo.data.texcoord);
+        o.mtlName = geo.material;
+        components.push(o);
+        
+        let imgPath = FREDDY_MATERIALS[o.mtlName] || "models/default.png";
+        if (!Renderer.textures[imgPath]) Renderer.loadTexture(imgPath);
+    }
+    return components;
+}
+
 
 
 window.onload = async () => {
     setupInput();
     
     if (Renderer.init('webgl-canvas')) {
-        console.log("正在載入 Freddy 舞台模型...");
+        console.log("正在載入所有模型...");
         
-        // 1. 抓取 OBJ 檔案
-        const response = await fetch('models/Freddy.obj');
-        const text = await response.text();
+        // 🌟 分別載入不同的姿勢，並存放在不同的變數裡
+        Renderer.freddyNormal = await loadAndParseModel('models/Freddy.obj'); // 站立姿
+        //Renderer.freddyAttack = await loadAndParseModel('models/Freddy_attack.obj'); // 攻擊姿 (假設你之後做了這個)
+        // Renderer.freddyWalk = await loadAndParseModel('models/Freddy_walk.obj'); 
         
-        // 2. 使用老師的解析器 (請把老師的 parseOBJ 函數複製到檔案底部)
-        const obj = parseOBJ(text);
-
-        // 3. 建立 Freddy 的零件列表
-        Renderer.freddyComponents = [];
-        
-        for (let i = 0; i < obj.geometries.length; i++) {
-            const geo = obj.geometries[i];
-            
-            // 使用老師的 initVertexBufferForLaterUse 概念建立 Buffer
-            let o = initVertexBufferForLaterUse(Renderer.gl, 
-                geo.data.position, 
-                geo.data.normal, 
-                geo.data.texcoord
-            );
-            
-            // 記錄這個零件對應的貼圖路徑
-            o.mtlName = geo.material;
-            Renderer.freddyComponents.push(o);
-            
-            // 4. 載入該零件所需的貼圖 (如果尚未載入)
-            let imgPath = FREDDY_MATERIALS[o.mtlName] || "models/default.png";
-            if (!Renderer.textures[imgPath]) {
-                Renderer.loadTexture(imgPath); // 呼叫你之前的載入貼圖函數
-            }
-        }
-        
-        console.log("Freddy 零件載入完成:", Renderer.freddyComponents.length);
+        console.log("模型載入完成，遊戲開始！");
         gameLoop();
     }
 };
