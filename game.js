@@ -37,7 +37,7 @@ const GameState = {
         location: 'cam1',
         timer: 0,
         moveInterval: 8, // 讓 Freddy 稍微難捉摸一點
-        path: ['cam1', 'cam2', 'cam4', 'door']
+        path: ['cam1', 'cam2', 'cam5','cam8','cam4', 'door']
     },
 };
 
@@ -380,7 +380,7 @@ function updateLogic() {
                     let newLocation = GameState.bonnie.path[currentIndex + 1];
                     GameState.bonnie.location = newLocation;
                     
-                    if(GameState.bonnie.location == 'cam7')AudioManager.play('Foot'); // 播放腳步聲
+                    if(GameState.bonnie.location == 'cam6')AudioManager.play('Foot'); // 播放腳步聲
                     console.log(`⚠️ Bonnie 從 ${oldLocation} 移動到了 ${newLocation}`);
                     
                     // 🌟 4. 同時讓這兩台攝影機黑屏！
@@ -389,6 +389,7 @@ function updateLogic() {
                 } 
                 else if (GameState.bonnie.location === 'door') {
                     if (GameState.leftDoorClosed) {
+                        AudioManager.play('Foot');
                         console.log("🛡️ Bonnie 撞到門，退回去了！");
                         GameState.bonnie.location = 'cam2';
                         GameState.flickerCams = ['door', 'cam2'];
@@ -403,6 +404,45 @@ function updateLogic() {
             }
         }
     }
+
+    if (GameState.power > 0) { 
+      GameState.freddy.timer += 0.01; 
+
+      if (GameState.freddy.timer >= GameState.freddy.moveInterval) {
+          GameState.freddy.timer = 0; // 重置計時
+
+          if (Math.random() > 0.4) {
+              // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+              let oldLocation = GameState.freddy.location;
+              let currentIndex = GameState.freddy.path.indexOf(oldLocation);
+              
+              if (currentIndex < GameState.freddy.path.length - 1) {
+                  let newLocation = GameState.freddy.path[currentIndex + 1];
+                  GameState.freddy.location = newLocation;
+                  
+                  AudioManager.play('FreddyLaugh'); // 播放 Freddy 的笑聲
+                  console.log(`⚠️ freddy 從 ${oldLocation} 移動到了 ${newLocation}`);
+                  
+                  // 🌟 4. 同時讓這兩台攝影機黑屏！
+                  GameState.flickerCams = [oldLocation, newLocation];
+                  GameState.flickerTimer = 1.5; 
+              } 
+              else if (GameState.freddy.location === 'door') {
+                  if (GameState.leftDoorClosed) {
+                      console.log("🛡️ freddy 撞到門，退回去了！");
+                      GameState.freddy.location = 'cam1';
+                      GameState.flickerCams = ['door', 'cam1'];
+                      GameState.flickerTimer = 1.5; 
+                  } else {
+                      AudioManager.play('Jumpscare');
+                      console.log("💀 JUMPSCARE！");
+                      GameState.freddy.location = 'jumpscare';
+                      GameState.power = 0; 
+                  }
+              }
+          }
+      }
+  }
 
 
 
@@ -468,7 +508,11 @@ window.onload = async () => {
       try {
           // 🌟 把它們包在 try 裡面
           Renderer.models.freddyNormal = await loadAndParseModel('models/Freddy.obj', FREDDY_MATERIALS);
-          
+          Renderer.models.freddyVent = await loadAndParseModel('models/Freddy_Climb.obj', FREDDY_MATERIALS);
+          Renderer.models.freddyDown = await loadAndParseModel('models/Freddy_down.obj', FREDDY_MATERIALS);
+          Renderer.models.freddyOut = await loadAndParseModel('models/Freddy_Out.obj', FREDDY_MATERIALS);
+          Renderer.models.freddyAttack = await loadAndParseModel('models/freddy__Attack.obj', FREDDY_MATERIALS);
+
           // 🚨 這裡請確認你的實際路徑！
           Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
           Renderer.models.bonnieCam2 = await loadAndParseModel('models/Bonnie_cam2.obj', BONNIE_MATERIALS);
@@ -478,14 +522,14 @@ window.onload = async () => {
           AudioManager.load('cam', 'sounds/Changing_Camera.mp3', 1.0);
           AudioManager.load('camup', 'sounds/Camara.mp3', 1.0); 
           AudioManager.load('Vent', 'sounds/vent.mp3', 1.0); 
-          AudioManager.load('Fan', 'sounds/Fan.mp3', 0.3); 
+          AudioManager.load('Fan', 'sounds/Fan.mp3', 0.1); 
           AudioManager.load('PowerOFF', 'sounds/NoPower.mp3', 0.8); 
           AudioManager.load('Dum', 'sounds/DumDumDum.mp3', 0.8);
           AudioManager.load('Door', 'sounds/Door.mp3', 0.8);
           AudioManager.load('FreddyLaugh', 'sounds/Freddy_Laugh.mp3', 0.8);
           AudioManager.load('light', 'sounds/Light.mp3', 0.6); 
           AudioManager.load('light2', 'sounds/Light.mp3', 0.6); 
-          AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.2); 
+          AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.4); 
 
           console.log("所有模型與音效載入完成！");
 

@@ -234,7 +234,7 @@ const Renderer = {
 
 
 
-    
+
 
     draw: function(gameState) {
         this.gl.clearColor(0.05, 0.05, 0.05, 1.0);
@@ -546,24 +546,41 @@ const Renderer = {
         
 
         if (Renderer.models && Renderer.models.freddyNormal) {
-            let loc = gameState.freddy.location;
-            
+            //let loc = gameState.freddy.location;
+
+            let loc = 'cam4';
+            let fScale = 1.8;
             // 決定要用哪一個模型！(預設為普通站姿)
             let currentModel = Renderer.models.freddyNormal; 
-
+            
             if (loc === 'cam1') {
                 // 畫在舞台上
                 // 🌟 修正 2：使用 currentModel 變數
-                this.drawCharacter(projMatrix, viewMatrix, 6, 1, -32, 1.8, 1.8, 1.8, 0, currentModel); 
-            } 
-            else if (loc === 'door' && gameState.leftLightOn) {
-                // 🚪 假設走到門口時，換成「攻擊姿勢」的模型！
-                if (Renderer.models.freddyAttack) {
-                    currentModel = Renderer.models.freddyAttack;
-                }
+                currentModel = Renderer.models.freddyNormal;
+                this.drawCharacter(projMatrix, viewMatrix, 6, 1, -32, fScale, fScale, fScale, 0, currentModel); 
+            }else if(loc === 'cam2'){
+                currentModel = Renderer.models.freddyNormal;
+                this.drawCharacter(projMatrix, viewMatrix, 10, 0, -18, fScale, fScale, fScale, 55, currentModel); 
+            }else if(loc === 'cam5'){
+                currentModel = Renderer.models.freddyDown;
+                this.drawCharacter(projMatrix, viewMatrix, 21, 0, -10, fScale, fScale, fScale, 135, currentModel); 
+            }else if(loc === 'cam8'){
+                currentModel = Renderer.models.freddyVent;
+                this.drawCharacter(projMatrix, viewMatrix, 27.5, 0, 6, 1.4, 1.4, 1.4, 0, currentModel); 
+            }else if(loc === 'cam4'){
+                currentModel = Renderer.models.freddyNormal;
+                this.drawCharacter(projMatrix, viewMatrix, 7, 0, 0, fScale, fScale, fScale, 180, currentModel); 
+            }else if (loc === 'door' && gameState.leftLightOn) {
+                currentModel = Renderer.models.freddyAttack;
+            }else if (loc === 'jumpscare') {
                 
-                // 🌟 修正 3：把座標改回門口！(你之前不小心複製到舞台的座標了)
-                this.drawCharacter(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.6, 0.6, 0.6, 90, currentModel);
+                
+            
+                let shakeX = Math.sin(gameState.time * 50) * 0.1;
+                let shakeY = Math.cos(gameState.time * 70) * 0.1;
+                
+                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale,fScale, 0, currentModel); 
             }
         }
 

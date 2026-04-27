@@ -1,0 +1,149 @@
+# Blender 5.1.1 MTL File: 'freedy.blend'
+# www.blender.org
+
+newmtl Endo1
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Endo1_baseColor.png
+
+newmtl Endo2
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Hat_Bowtie_baseColor.png
+
+newmtl Eyebrows_Freckles
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Hat_Bowtie_baseColor.png
+
+newmtl Hat_Bowtie
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Hat_Bowtie_baseColor.png
+
+newmtl Nose
+Ns 473.620605
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Hat_Bowtie_baseColor.png
+
+newmtl Suit_1
+Ns 457.799774
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.010000 0.010000 0.010000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Suit_1_baseColor.png
+map_Bump -bm 1.000000 C:/Suit_1_normal.png
+
+newmtl Suit_1_HEAD
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.010000 0.010000 0.010000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Suit_1_baseColor.png
+map_Bump -bm 1.000000 C:/Suit_1_JAW_normal.png
+
+newmtl Suit_1_JAW
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.010000 0.010000 0.010000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Suit_1_baseColor.png
+map_Bump -bm 1.000000 C:/Suit_1_JAW_normal.png
+
+newmtl Suit_2
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.010000 0.010000 0.010000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Suit_2_baseColor.png
+map_Bump -bm 1.000000 C:/Suit_1_normal.png
+
+newmtl Suit_2_HEAD
+Ns 250.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.010000 0.010000 0.010000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Suit_2_baseColor.png
+map_Bump -bm 1.000000 C:/Suit_1_JAW_normal.png
+
+newmtl Teeths
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Teeths_baseColor.png
+
+newmtl Wire
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Wire_baseColor.png
+map_Bump -bm 1.000000 C:/Wire_normal.png
+
+newmtl material
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/material_baseColor.png
+map_Bump -bm 1.000000 C:/Suit_1_normal.png
+
+newmtl material_13
+Ns 636.236023
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/material_13_baseColor.png
