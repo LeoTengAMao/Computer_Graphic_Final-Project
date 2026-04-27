@@ -534,7 +534,7 @@ const Renderer = {
         // 🌟 防呆檢查：確定大腦 (game.js) 已經把 Bonnie 的模型載入完畢了
         if (Renderer.models && Renderer.models.bonnieNormal) {
             //let bLoc = gameState.bonnie.location;
-            let bLoc = 'cam2';
+            let bLoc = 'jumpscare';
             let currentBonnie = Renderer.models.bonnieNormal; // 預設使用普通站姿
             
             // 設定 Bonnie 在一般場景裡的大小 (請依據你的模型實際大小微調，這裡先預設跟 Freddy 一樣 1.8)
@@ -554,23 +554,31 @@ const Renderer = {
             else if (bLoc === 'cam4') {
                 // 🔦 在右側走廊 / 通風管入口附近
                 this.drawCharacter(projMatrix, viewMatrix, 8, 1, 2, bScale, bScale, bScale, -45, currentBonnie); 
+            }
+            else if (bLoc === 'cam6') {
+                // 🔦 在右側走廊 / 通風管入口附近
+                this.drawCharacter(projMatrix, viewMatrix, -18, 0, 13, bScale, bScale, bScale, 90, currentBonnie); 
             } 
+            else if (bLoc === 'cam7') {
+                // 🔦 在右側走廊 / 通風管入口附近
+                this.drawCharacter(projMatrix, viewMatrix, -11, 0, 7.8, bScale, bScale, bScale, 145, currentBonnie); 
+            }  
             else if (bLoc === 'door') {
                 // 🚨 關鍵：她已經走到門邊了！只有玩家開燈時才畫出來
                 if (gameState.leftLightOn) {
                     // 畫在左邊門口的窗外，旋轉 90 度讓她面向辦公室裡面
                     // 這裡的縮放設定為 0.6，配合門口的大小
-                    this.drawCharacter(projMatrix, viewMatrix, -3.5, 0, 10.5, 0.45, 0.45, 0.45, 90, currentBonnie); 
+                    this.drawCharacter(projMatrix, viewMatrix, -5.5, 0, 11, 0.03, 0.03, 0.03, 90, currentBonnie); 
                 }
             } 
             else if (bLoc === 'jumpscare') {
                 // 💀 突發驚嚇！
                 // 利用原本的三角函數做出瘋狂抖動的效果
-                let shakeX = Math.sin(gameState.time * 50) * 0.5;
-                let shakeY = Math.cos(gameState.time * 70) * 0.5;
+                let shakeX = Math.sin(gameState.time * 50) * 0.1;
+                let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
                 // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -0.5 + shakeY, 9, 0.45, 0.45, 0.45, 0, currentBonnie); 
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -1 + shakeY, 11, 0.03, 0.03, 0.03, 0, currentBonnie); 
             }
         }
         

@@ -31,7 +31,7 @@ const GameState = {
         location: 'cam1', // 一開始在主舞台
         timer: 0,         
         moveInterval: 5,  
-        path: ['cam1', 'cam2', 'cam4', 'door'] 
+        path: ['cam1', 'cam2', 'cam7','cam6', 'door'] 
     },
     freddy: {
         location: 'cam1',
