@@ -1,0 +1,159 @@
+# Blender 5.1.1 MTL File: 'None'
+# www.blender.org
+
+newmtl Endo-1.002
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Endo-1.002_baseColor.png
+
+newmtl Endo-2.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Endo-2.001_baseColor.png
+
+newmtl Endo-Teeths.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Endo-Teeths.001_baseColor.png
+
+newmtl Endo_Wire.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Endo_Wire.001_baseColor.png
+map_Bump -bm 1.000000 C:/Endo_Wire.001_normal.png
+
+newmtl Eye.005
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Eye.005_baseColor.png
+
+newmtl Golden_Teeths.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Kd 0.033102 0.014708 0.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+
+newmtl Hook.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Kd 0.061263 0.061263 0.061263
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+
+newmtl Jaw.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Jaw.001_baseColor.png
+
+newmtl Nose
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Nose_baseColor.png
+map_Bump -bm 1.000000 C:/Nose_normal.png
+
+newmtl foxy_skin
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/foxy_skin_baseColor.png
+map_Bump -bm 1.000000 C:/foxy_skin_normal.png
+
+newmtl foxy_skin.002
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/foxy_skin.002_baseColor.png
+map_Bump -bm 1.000000 C:/foxy_skin_normal.png
+
+newmtl foxy_skin.003
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/foxy_skin.003_baseColor.png
+map_Bump -bm 1.000000 C:/foxy_skin_normal.png
+
+newmtl foxy_snout.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/foxy_snout.001_baseColor.png
+map_Bump -bm 1.000000 C:/foxy_skin_normal.png
+
+newmtl pants
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/pants_baseColor.png
+map_Bump -bm 1.000000 C:/foxy_skin_normal.png
+
+newmtl teeths.001
+Ns 159.999985
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/teeths.001_baseColor.png

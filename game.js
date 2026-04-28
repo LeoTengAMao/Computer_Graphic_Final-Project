@@ -7,6 +7,10 @@ const GameState = {
     obCam: { x: 0, y: 15, z: 20, pitch: -30, yaw: 0 }, 
     // 紀錄鍵盤按下的狀態
     keys: { w: false, a: false, s: false, d: false, Space: false, shift: false }, // 🌟 修復1：這裡補上逗號了！
+
+    timeElapsed: 0,    // 總經過秒數
+    currentHour: 12,   // 顯示的小時 (從 12 開始)
+    hourDuration: 90,  // 設定「一小時」等於現實生活的幾秒 (FNAF1 大約是 86-90秒)
     
     guardYaw: 0,        // 目前實際角度
     targetGuardYaw: 0,  // 滑鼠希望轉到的目標角度 (-90 到 90)   
@@ -25,24 +29,33 @@ const GameState = {
     // 🌟 新增：專屬頻道的干擾系統
     flickerTimer: 0,     
     flickerCams: [],
+
     gameStarted:false, // 遊戲是否開始了，還在讀取畫面中不能操作
+
     bonnie: {
         location: 'cam1', // 一開始在主舞台
         timer: 0,         
-        moveInterval: 5,  
+        moveInterval: 10,  
         path: ['cam1', 'cam2', 'cam7','cam6', 'door'] 
     },
     freddy: {
         location: 'cam1',
         timer: 0,
-        moveInterval: 8, // 讓 Freddy 稍微難捉摸一點
+        moveInterval: 16, // 讓 Freddy 稍微難捉摸一點
         path: ['cam1', 'cam2', 'cam5','cam8','cam4', 'door']
     },
+
+    chica: {
+      location: 'cam1',
+      timer: 0,
+      moveInterval: 12, 
+      path: ['cam1', 'cam2', 'cam4', 'door']
+  },
 
     foxy: {
       location: 'cam3',
       timer: 0,
-      moveInterval: 20,
+      moveInterval: 200,
       phase : 0,
       runProgress :0,
       path: ['cam3','cam6','door']
@@ -126,10 +139,6 @@ const BONNIE_MATERIALS = {
 };
 
 
-const CHICA_MATERIALS = {
-    "Body": "models/Chica_Body.png",
-    "Cupcake": "models/Cupcake.png"
-};
 
 const FOXY_MATERIALS = {
   // Foxy 的皮膚與外殼
@@ -150,12 +159,14 @@ const FOXY_MATERIALS = {
   "Eye.005": "models/Foxy/Eye.005_baseColor.png",
   "Endo-Teeths.001": "models/Foxy/Endo-Teeths.001_baseColor.png",
   "teeths.001": "models/Foxy/teeths.001_baseColor.png",
-
-  // ⚠️ 預防 404 報錯的借用材質 ⚠️
-  // 從 MTL 檔發現，Hook(鐵鉤) 跟 Golden_Teeths(金牙) 只有純色，沒有圖片 (map_Kd)
-  // 為了避免你的解析器找不到圖片而當機，我們先借用骨架和牙齒的圖片貼上去
   "Hook.001": "models/Foxy/Endo-1.002_baseColor.png",       // 借用灰色的骨架鐵色
   "Golden_Teeths.001": "models/Foxy/teeths.001_baseColor.png" // 借用普通的牙齒顏色
+};
+
+const CHICA_MATERIALS = {
+  "Body_CH": "models/Chica/Body_CH_baseColor.jpeg",
+  "Eyes_CH": "models/Chica/Eyes_CH_baseColor.jpeg",
+  "Endo_CH": "models/Foxy/Endo-1.002_baseColor.png" 
 };
 
 // game.js 裡的 loadOBJModel
@@ -436,6 +447,51 @@ function updateLogic() {
         }
     }
 
+
+     // 🤖 怪物 AI 邏輯 (Chica)
+    if (GameState.power > 0) { 
+      GameState.chica.timer += 0.01; 
+
+      if (GameState.chica.timer >= GameState.chica.moveInterval) {
+          GameState.chica.timer = 0; // 重置計時
+
+          if (Math.random() > 0.4) {
+              // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+              let oldLocation = GameState.chica.location;
+              let currentIndex = GameState.chica.path.indexOf(oldLocation);
+              
+              if (currentIndex < GameState.chica.path.length - 1) {
+                  let newLocation = GameState.chica.path[currentIndex + 1];
+                  GameState.chica.location = newLocation;
+                  
+                  if(GameState.chica.location == 'cam4')AudioManager.play('Foot'); // 播放腳步聲
+                  console.log(`⚠️ chica 從 ${oldLocation} 移動到了 ${newLocation}`);
+                  
+                  // 🌟 4. 同時讓這兩台攝影機黑屏！
+                  GameState.flickerCams = [oldLocation, newLocation];
+                  GameState.flickerTimer = 1.5; 
+              } 
+              else if (GameState.chica.location === 'door') {
+                  if (GameState.rightDoorClosed) {
+                      AudioManager.play('Foot');
+                      console.log("🛡️ chica 撞到門，退回去了！");
+                      GameState.chica.location = 'cam1';
+                      GameState.flickerCams = ['door', 'cam1'];
+                      GameState.flickerTimer = 1.5; 
+                  } else {
+                      AudioManager.play('Jumpscare');
+                      console.log("💀 JUMPSCARE！");
+                      GameState.chica.location = 'jumpscare';
+                      GameState.power = 0; 
+                  }
+              }
+          }
+      }
+  }
+
+
+
+
     if (GameState.power > 0) { 
       GameState.freddy.timer += 0.01; 
 
@@ -459,7 +515,7 @@ function updateLogic() {
                   GameState.flickerTimer = 1.5; 
               } 
               else if (GameState.freddy.location === 'door') {
-                  if (GameState.leftDoorClosed) {
+                  if (GameState.rightDoorClosed) {
                       console.log("🛡️ freddy 撞到門，退回去了！");
                       GameState.freddy.location = 'cam1';
                       GameState.flickerCams = ['door', 'cam1'];
@@ -484,11 +540,11 @@ function updateLogic() {
 
       if (GameState.foxy.timer >= GameState.foxy.moveInterval) {
           GameState.foxy.timer = 0; // 重置計時
-          if (GameState.foxy.phase < 3) {
+          if (GameState.foxy.phase < 4) {
               GameState.foxy.phase++;
               AudioManager.play('Dum'); // 探頭時的音效
           }
-          if (GameState.foxy.phase === 3) {
+          if (GameState.foxy.phase ===4 ) {
               GameState.foxy.moveInterval = 5;
               // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
               let oldLocation = GameState.foxy.location;
@@ -504,13 +560,10 @@ function updateLogic() {
                   }
                   console.log(`⚠️ foxy 從 ${oldLocation} 移動到了 ${newLocation}`);
                   
-                  // 🌟 4. 同時讓這兩台攝影機黑屏！
-                  GameState.flickerCams = [oldLocation, newLocation];
-                  GameState.flickerTimer = 1.5; 
               } 
               else if (GameState.foxy.location === 'door') {
                   if (GameState.leftDoorClosed) {
-                      GameState.foxy.phase = 0;
+                      GameState.foxy.phase = 1;
                       GameState.foxy.moveInterval = 50; // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
                       console.log("🛡️ foxy 撞到門，退回去了！");
                       AudioManager.play('Foxy_Hit_Door');
@@ -583,10 +636,64 @@ if (GameState.foxy.location === 'cam6') {
         GameState.fanAngle += 360;
     }
   }
+    if (GameState.gameStarted && !GameState.isPowerOut) {
+          
+      // 1. 增加經過的時間 (假設遊戲每秒執行 60 次，所以每次加 1/60 秒)
+      GameState.timeElapsed += (1 / 60);
+
+      // 2. 計算目前的小時
+      // 每過 hourDuration 秒，小時就加 1
+      let totalHoursPassed = Math.floor(GameState.timeElapsed / GameState.hourDuration);
+      
+      // 轉換為 12, 1, 2, 3, 4, 5, 6 的格式
+      let displayHour = 12 + totalHoursPassed;
+      if (displayHour > 12) displayHour -= 12; 
+      
+      GameState.currentHour = displayHour;
+
+      // 3. 更新 UI 文字
+      const timeUI = document.getElementById('time-display');
+      if (timeUI) {
+          timeUI.innerText = GameState.currentHour + " AM";
+          timeUI.style.display = 'block'; // 遊戲開始後才顯示
+      }
+
+      // 4. 勝利條件判定：到了早上 6 點
+      if (totalHoursPassed >= 6) {
+          winGame();
+          return; // 停止迴圈
+      }
+  }
 
     updateLogic();
     Renderer.draw(GameState);
     requestAnimationFrame(gameLoop);
+}
+
+function winGame() {
+  gameState.gameStarted = false;
+  
+  // 播放 6 AM 的經典鐘聲與小孩子歡呼聲
+  AudioManager.stopAll(); // 停止風扇聲、跑步聲
+  AudioManager.play('6AM'); 
+  
+  // 顯示勝利畫面
+  const overlay = document.createElement('div');
+  overlay.style.position = 'absolute';
+  overlay.style.top = '0';
+  overlay.style.left = '0';
+  overlay.style.width = '100%';
+  overlay.style.height = '100%';
+  overlay.style.backgroundColor = 'black';
+  overlay.style.color = '#fff';
+  overlay.style.display = 'flex';
+  overlay.style.flexDirection = 'column';
+  overlay.style.justifyContent = 'center';
+  overlay.style.alignItems = 'center';
+  overlay.innerHTML = '<h1 style="font-size: 80px;">6 AM</h1><p>恭喜活過這一晚！</p>';
+  document.body.appendChild(overlay);
+
+  console.log("🎊 恭喜！你活到了 6 AM！");
 }
 
 async function loadAndParseModel(objUrl, materialDict) {
@@ -630,9 +737,22 @@ window.onload = async () => {
           // 🚨 這裡請確認你的實際路徑！
           Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
           Renderer.models.bonnieCam2 = await loadAndParseModel('models/Bonnie_cam2.obj', BONNIE_MATERIALS);
+          Renderer.models.bonnieCam6 = await loadAndParseModel('models/Bonnie_Standby.obj', BONNIE_MATERIALS);
+          Renderer.models.bonnieCam7 = await loadAndParseModel('models/Bonnie_Peek.obj', BONNIE_MATERIALS);
+          Renderer.models.bonnieAttack = await loadAndParseModel('models/Bonnie_Attack.obj', BONNIE_MATERIALS);
           //Foxy
           Renderer.models.foxyNormal = await loadAndParseModel('models/Foxy.obj', FOXY_MATERIALS);
-          
+          Renderer.models.foxyP1 = await loadAndParseModel('models/Foxy_P1.obj', FOXY_MATERIALS);
+          Renderer.models.foxyP2 = await loadAndParseModel('models/Foxy_P2.obj', FOXY_MATERIALS);
+          Renderer.models.foxyP3 = await loadAndParseModel('models/Foxy_P3.obj', FOXY_MATERIALS);
+          Renderer.models.foxyL = await loadAndParseModel('models/FoxyLeft.obj', FOXY_MATERIALS);
+          Renderer.models.foxyR = await loadAndParseModel('models/FoxyRight.obj', FOXY_MATERIALS);
+
+          Renderer.models.chicaNormal = await loadAndParseModel('models/Chica.obj', CHICA_MATERIALS);
+          Renderer.models.chicaCam2 = await loadAndParseModel('models/Chica_Cam2.obj', CHICA_MATERIALS);
+          Renderer.models.chicaCam4 = await loadAndParseModel('models/Chica_Cam4.obj', CHICA_MATERIALS);
+          Renderer.models.chicaAttack = await loadAndParseModel('models/Chica_Attack.obj', CHICA_MATERIALS);
+
           // 載入音效 (你的 AudioManager 程式碼)
           AudioManager.load('Jumpscare', 'sounds/Jumpscare.mp3', 1.0); 
           AudioManager.load('cam', 'sounds/Changing_Camera.mp3', 1.0);
@@ -640,7 +760,7 @@ window.onload = async () => {
           AudioManager.load('Vent', 'sounds/vent.mp3', 1.0); 
           AudioManager.load('Fan', 'sounds/Fan.mp3', 0.1); 
           AudioManager.load('PowerOFF', 'sounds/NoPower.mp3', 0.8); 
-          AudioManager.load('Dum', 'sounds/DumDumDum.mp3', 0.8);
+          AudioManager.load('Dum', 'sounds/DumDumDum.mp3', 0.1);
           AudioManager.load('Door', 'sounds/Door.mp3', 0.8);
           AudioManager.load('FreddyLaugh', 'sounds/Freddy_Laugh.mp3', 0.8);
           AudioManager.load('light', 'sounds/Light.mp3', 0.6); 
@@ -648,7 +768,7 @@ window.onload = async () => {
           AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.4); 
           AudioManager.load('run', 'sounds/Foxy_Run.mp3', 0.8); 
           AudioManager.load('Foxy_Hit_Door', 'sounds/Foxy_Hit_Door.mp3', 0.8); 
-
+          AudioManager.load('6AM', 'sounds/6AM.mp3', 0.8); 
           console.log("所有模型與音效載入完成！");
 
           // 成功載入才顯示按鈕

@@ -1,0 +1,33 @@
+# Blender 5.1.1 MTL File: 'None'
+# www.blender.org
+
+newmtl Body_CH
+Ns 1000.000000
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Body_CH_baseColor.jpeg
+
+newmtl Endo_CH
+Ns 795.323669
+Ka 0.673018 0.673018 0.673018
+Kd 0.800000 0.800000 0.800000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 3
+
+newmtl Eyes_CH
+Ns 307.512695
+Ka 1.000000 1.000000 1.000000
+Ks 0.500000 0.500000 0.500000
+Ke 0.000000 0.000000 0.000000
+Ni 1.500000
+d 1.000000
+illum 2
+map_Kd C:/Eyes_CH_baseColor.jpeg
+map_Bump -bm 0.096000 C:/Eyes_CH_normal.png

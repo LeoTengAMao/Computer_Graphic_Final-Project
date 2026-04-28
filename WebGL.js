@@ -567,7 +567,7 @@ const Renderer = {
                 // 🎸 在舞台上 (稍微靠左邊一點)
                 // 參數：投影, 視角, X, Y, Z, 縮放X, 縮放Y, 縮放Z, 旋轉Y角, 模型檔案
                 currentBonnie = Renderer.models.bonnieNormal;
-                this.drawCharacter(projMatrix, viewMatrix, -3, 1, -32, bScale, bScale, bScale, 0, currentBonnie); 
+                this.drawCharacter(projMatrix, viewMatrix, -4, 1, -32, bScale, bScale, bScale, 0, currentBonnie); 
             } 
             else if (bLoc === 'cam2') {
                 // 🍕 在用餐區長桌旁 (稍微轉個 45 度角看著鏡頭會比較恐怖)
@@ -580,10 +580,12 @@ const Renderer = {
             }
             else if (bLoc === 'cam6') {
                 // 🔦 在右側走廊 / 通風管入口附近
+                currentBonnie = Renderer.models.bonnieCam6;
                 this.drawCharacter(projMatrix, viewMatrix, -18, 0, 13, bScale, bScale, bScale, 90, currentBonnie); 
             } 
             else if (bLoc === 'cam7') {
                 // 🔦 在右側走廊 / 通風管入口附近
+                currentBonnie = Renderer.models.bonnieCam7;
                 this.drawCharacter(projMatrix, viewMatrix, -11, 0, 7.8, bScale, bScale, bScale, 145, currentBonnie); 
             }  
             else if (bLoc === 'door') {
@@ -597,6 +599,7 @@ const Renderer = {
             else if (bLoc === 'jumpscare') {
                 // 💀 突發驚嚇！
                 // 利用原本的三角函數做出瘋狂抖動的效果
+                currentBonnie = Renderer.models.bonnieAttack;
                 let shakeX = Math.sin(gameState.time * 50) * 0.1;
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
@@ -604,6 +607,8 @@ const Renderer = {
                 this.drawCharacter(projMatrix, viewMatrix, shakeX, -1 + shakeY, 11, 0.03, 0.03, 0.03, 0, currentBonnie); 
             }
         }
+
+        
         
 
         if (Renderer.models && Renderer.models.freddyNormal) {
@@ -618,7 +623,7 @@ const Renderer = {
                 // 畫在舞台上
                 // 🌟 修正 2：使用 currentModel 變數
                 currentModel = Renderer.models.freddyNormal;
-                this.drawCharacter(projMatrix, viewMatrix, 6, 1, -32, fScale, fScale, fScale, 0, currentModel); 
+                this.drawCharacter(projMatrix, viewMatrix, 3, 1, -32, fScale, fScale, fScale, 0, currentModel); 
             }else if(loc === 'cam2'){
                 currentModel = Renderer.models.freddyNormal;
                 this.drawCharacter(projMatrix, viewMatrix, 10, 0, -18, fScale, fScale, fScale, 55, currentModel); 
@@ -641,7 +646,45 @@ const Renderer = {
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
                 // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale,fScale, 0, currentModel); 
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, fScale, fScale,fScale, 0, currentModel); 
+            }
+        }
+
+        if (Renderer.models && Renderer.models.chicaNormal) {
+            let loc = gameState.chica.location;
+
+            //let loc = 'cam4';
+            let CScale = 0.045;
+            // 決定要用哪一個模型！(預設為普通站姿)
+            let currentModel = Renderer.models.chicaNormal; 
+            
+            if (loc === 'cam1') {
+                currentModel = Renderer.models.chicaNormal;
+                this.drawCharacter(projMatrix, viewMatrix, 0, 1, -32, CScale, CScale, CScale, 0, currentModel); 
+            }else if(loc === 'cam2'){
+                currentModel = Renderer.models.chicaCam2;
+                this.drawCharacter(projMatrix, viewMatrix, -2, 0, -9, CScale, CScale, CScale, 90, currentModel); 
+                
+            }else if(loc === 'cam4'){
+                currentModel = Renderer.models.chicaCam4;
+                this.drawCharacter(projMatrix, viewMatrix, 9, 0, -3, CScale, CScale, CScale, 200 , currentModel); 
+                
+            }else if (loc === 'door' && gameState.rightLightOn) {
+                currentModel = Renderer.models.chicaNormal;
+
+                if (gameState.rightLightOn) {
+
+                    this.drawCharacter(projMatrix, viewMatrix, -0.5, 0, 5, CScale, CScale, CScale, 0, currentModel); 
+                }
+            }else if (loc === 'jumpscare') {
+                currentModel = Renderer.models.chicaAttack;
+                
+            
+                let shakeX = Math.sin(gameState.time * 50) * 0.1;
+                let shakeY = Math.cos(gameState.time * 70) * 0.1;
+                
+                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, CScale, CScale, CScale, 0, currentModel); 
             }
         }
 
@@ -657,11 +700,11 @@ const Renderer = {
                 if(GameState.foxy.phase === 0){
                     currentModel = Renderer.models.foxyNormal;
                 }else if(GameState.foxy.phase === 1){
-                    currentModel = Renderer.models.foxyNormal;
+                    currentModel = Renderer.models.foxyP1;
                 }else if(GameState.foxy.phase === 2){
-                    currentModel = Renderer.models.foxyNormal;
+                    currentModel = Renderer.models.foxyP2;
                 }else if(GameState.foxy.phase === 3){
-                    currentModel = Renderer.models.foxyNormal;
+                    currentModel = Renderer.models.foxyP3;
                 }
                 this.drawCharacter(projMatrix, viewMatrix, -18, 1, -18, foxyScale, foxyScale, foxyScale, 90, currentModel); 
             }else if (loc === 'cam6') {
@@ -670,7 +713,7 @@ const Renderer = {
                 let isLeftFoot = Math.floor(Date.now() / 150) % 2 === 0; 
                 
                 // 根據上面的計算，決定現在要畫哪一個模型
-                let currentModel = isLeftFoot ? Renderer.models.foxyNormal : Renderer.models.foxyNormal;
+                let currentModel = isLeftFoot ? Renderer.models.foxyL : Renderer.models.foxyR;
 
                 // 🦊 2. 衝刺位移：計算 Foxy 目前在走廊的深度 (Z 軸)
                 // 假設左走廊盡頭是 Z = -30，警衛室門口是 Z = -5 (請依照你實際的地圖座標微調)
@@ -694,7 +737,7 @@ const Renderer = {
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
                 // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, foxyScale, foxyScale, foxyScale, 0, currentModel); 
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, foxyScale, foxyScale, foxyScale, 0, currentModel); 
             }
         }
 
