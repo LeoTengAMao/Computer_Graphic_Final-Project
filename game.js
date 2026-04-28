@@ -567,7 +567,7 @@ if (GameState.foxy.location === 'cam6') {
 
     // 2. 每一幀增加進度 (數字越大衝越快，0.02 大約是 1秒鐘跑完)
     if (GameState.foxy.runProgress < 1.0) {
-        GameState.foxy.runProgress += 0.02; 
+        GameState.foxy.runProgress += 0.015; 
     }
 } else {
     // 3. 如果 Foxy 不在走廊了 (例如被門擋回海盜灣，或是跳出 Jumpscare)

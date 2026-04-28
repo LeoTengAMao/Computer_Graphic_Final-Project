@@ -675,7 +675,7 @@ const Renderer = {
                 // 🦊 2. 衝刺位移：計算 Foxy 目前在走廊的深度 (Z 軸)
                 // 假設左走廊盡頭是 Z = -30，警衛室門口是 Z = -5 (請依照你實際的地圖座標微調)
                 let startx = -18;
-                let endx = 4; 
+                let endx = 0; 
                 
                 // 讀取大腦裡的「奔跑進度 (0.0 ~ 1.0)」，算出現在真正的 Z 座標
                 // (如果沒讀到，預設給 0，避免報錯)
@@ -684,7 +684,7 @@ const Renderer = {
                 // 🦊 3. 畫出狂奔的 Foxy！
                 // 假設左走廊在 X = -10，高度 Y = 0，轉向面對玩家 (角度視你的模型而定，通常是 0 或 180)
                 if (currentModel) {
-                    this.drawCharacter(projMatrix, viewMatrix, currentX, 0, 13, foxyScale, foxyScale, foxyScale, 0, currentModel);
+                    this.drawCharacter(projMatrix, viewMatrix, currentX, 0, 11, foxyScale, foxyScale, foxyScale, 90, currentModel);
                 }
             }else if (loc === 'jumpscare') {
                 currentModel = Renderer.models.foxyNormal;
@@ -694,7 +694,7 @@ const Renderer = {
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
                 // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, foxyScale, foxyScale, foxyScale, 0, currentModel); 
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, foxyScale, foxyScale, foxyScale, 0, currentModel); 
             }
         }
 
