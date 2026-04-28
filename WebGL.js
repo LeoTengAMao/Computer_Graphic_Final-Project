@@ -645,6 +645,29 @@ const Renderer = {
             }
         }
 
+        if (Renderer.models && Renderer.models.foxyNormal) {
+            let loc = gameState.foxy.location;
+
+            //let loc = 'jumpscare';
+            let foxyScale = 1.8;
+            // 決定要用哪一個模型！(預設為普通站姿)
+            let currentModel = Renderer.models.foxyNormal; 
+            
+            if (loc === 'cam3') {
+                currentModel = Renderer.models.foxyNormal;
+                this.drawCharacter(projMatrix, viewMatrix, -18, 0.5, -18, foxyScale, foxyScale, foxyScale, 0, currentModel); 
+            }else if (loc === 'jumpscare') {
+                currentModel = Renderer.models.freddyAttack;
+                
+            
+                let shakeX = Math.sin(gameState.time * 50) * 0.1;
+                let shakeY = Math.cos(gameState.time * 70) * 0.1;
+                
+                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale,fScale, 0, currentModel); 
+            }
+        }
+
     },
 
 

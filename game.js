@@ -38,6 +38,13 @@ const GameState = {
         moveInterval: 8, // 讓 Freddy 稍微難捉摸一點
         path: ['cam1', 'cam2', 'cam5','cam8','cam4', 'door']
     },
+
+    foxy: {
+      location: 'cam3',
+      timer: 0,
+      moveInterval: 8, // 讓 Freddy 稍微難捉摸一點
+      path: ['cam1', 'cam2', 'cam5','cam8','cam4', 'door']
+  },
 };
 
 const AudioManager = {
@@ -116,14 +123,37 @@ const BONNIE_MATERIALS = {
   "material": "models/Bonnie/material_baseColor.png"
 };
 
+
 const CHICA_MATERIALS = {
     "Body": "models/Chica_Body.png",
     "Cupcake": "models/Cupcake.png"
 };
 
 const FOXY_MATERIALS = {
-    "Body": "models/Foxy_Body.png",
-    "Hook": "models/Foxy_Hook.png"
+  // Foxy 的皮膚與外殼
+  "foxy_skin": "models/Foxy/foxy_skin_baseColor.png",
+  "foxy_skin.002": "models/Foxy/foxy_skin.002_baseColor.png",
+  "foxy_skin.003": "models/Foxy/foxy_skin.003_baseColor.png",
+  "foxy_snout.001": "models/Foxy/foxy_snout.001_baseColor.png", // 嘴管/吻部
+  "Jaw.001": "models/Foxy/Jaw.001_baseColor.png",             // 下巴
+  "Nose": "models/Foxy/Nose_baseColor.png",                   // 鼻子
+  "pants": "models/Foxy/pants_baseColor.png",                 // 招牌海盜褲
+
+  // 內骨骼 (Endoskeleton) 與線材
+  "Endo-1.002": "models/Foxy/Endo-1.002_baseColor.png",
+  "Endo-2.001": "models/Foxy/Endo-2.001_baseColor.png",
+  "Endo_Wire.001": "models/Foxy/Endo_Wire.001_baseColor.png",
+  
+  // 眼睛與牙齒
+  "Eye.005": "models/Foxy/Eye.005_baseColor.png",
+  "Endo-Teeths.001": "models/Foxy/Endo-Teeths.001_baseColor.png",
+  "teeths.001": "models/Foxy/teeths.001_baseColor.png",
+
+  // ⚠️ 預防 404 報錯的借用材質 ⚠️
+  // 從 MTL 檔發現，Hook(鐵鉤) 跟 Golden_Teeths(金牙) 只有純色，沒有圖片 (map_Kd)
+  // 為了避免你的解析器找不到圖片而當機，我們先借用骨架和牙齒的圖片貼上去
+  "Hook.001": "models/Foxy/Endo-1.002_baseColor.png",       // 借用灰色的骨架鐵色
+  "Golden_Teeths.001": "models/Foxy/teeths.001_baseColor.png" // 借用普通的牙齒顏色
 };
 
 // game.js 裡的 loadOBJModel
@@ -525,6 +555,8 @@ window.onload = async () => {
           // 🚨 這裡請確認你的實際路徑！
           Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
           Renderer.models.bonnieCam2 = await loadAndParseModel('models/Bonnie_cam2.obj', BONNIE_MATERIALS);
+          //Foxy
+          Renderer.models.foxyNormal = await loadAndParseModel('models/Foxy.obj', FOXY_MATERIALS);
           
           // 載入音效 (你的 AudioManager 程式碼)
           AudioManager.load('Jumpscare', 'sounds/Jumpscare.mp3', 1.0); 
