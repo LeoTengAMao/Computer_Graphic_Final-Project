@@ -649,13 +649,13 @@ const Renderer = {
             let loc = gameState.foxy.location;
 
             //let loc = 'jumpscare';
-            let foxyScale = 1.8;
+            let foxyScale = 0.2;
             // 決定要用哪一個模型！(預設為普通站姿)
             let currentModel = Renderer.models.foxyNormal; 
             
             if (loc === 'cam3') {
                 currentModel = Renderer.models.foxyNormal;
-                this.drawCharacter(projMatrix, viewMatrix, -18, 0.5, -18, foxyScale, foxyScale, foxyScale, 0, currentModel); 
+                this.drawCharacter(projMatrix, viewMatrix, -18, 1, -18, foxyScale, foxyScale, foxyScale, 90, currentModel); 
             }else if (loc === 'jumpscare') {
                 currentModel = Renderer.models.freddyAttack;
                 
