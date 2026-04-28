@@ -654,17 +654,47 @@ const Renderer = {
             let currentModel = Renderer.models.foxyNormal; 
             
             if (loc === 'cam3') {
-                currentModel = Renderer.models.foxyNormal;
+                if(GameState.foxy.phase === 0){
+                    currentModel = Renderer.models.foxyNormal;
+                }else if(GameState.foxy.phase === 1){
+                    currentModel = Renderer.models.foxyNormal;
+                }else if(GameState.foxy.phase === 2){
+                    currentModel = Renderer.models.foxyNormal;
+                }else if(GameState.foxy.phase === 3){
+                    currentModel = Renderer.models.foxyNormal;
+                }
                 this.drawCharacter(projMatrix, viewMatrix, -18, 1, -18, foxyScale, foxyScale, foxyScale, 90, currentModel); 
+            }else if (loc === 'cam6') {
+                // 🦊 1. 動畫魔法：每 150 毫秒切換一次左右腳！
+                // 這樣會產生 0, 1, 0, 1 的循環
+                let isLeftFoot = Math.floor(Date.now() / 150) % 2 === 0; 
+                
+                // 根據上面的計算，決定現在要畫哪一個模型
+                let currentModel = isLeftFoot ? Renderer.models.foxyNormal : Renderer.models.foxyNormal;
+
+                // 🦊 2. 衝刺位移：計算 Foxy 目前在走廊的深度 (Z 軸)
+                // 假設左走廊盡頭是 Z = -30，警衛室門口是 Z = -5 (請依照你實際的地圖座標微調)
+                let startx = -18;
+                let endx = 4; 
+                
+                // 讀取大腦裡的「奔跑進度 (0.0 ~ 1.0)」，算出現在真正的 Z 座標
+                // (如果沒讀到，預設給 0，避免報錯)
+                let currentX = startx + (endx - startx) * (gameState.foxy.runProgress || 0);
+
+                // 🦊 3. 畫出狂奔的 Foxy！
+                // 假設左走廊在 X = -10，高度 Y = 0，轉向面對玩家 (角度視你的模型而定，通常是 0 或 180)
+                if (currentModel) {
+                    this.drawCharacter(projMatrix, viewMatrix, currentX, 0, 13, foxyScale, foxyScale, foxyScale, 0, currentModel);
+                }
             }else if (loc === 'jumpscare') {
-                currentModel = Renderer.models.freddyAttack;
+                currentModel = Renderer.models.foxyNormal;
                 
             
                 let shakeX = Math.sin(gameState.time * 50) * 0.1;
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
                 // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale,fScale, 0, currentModel); 
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, foxyScale, foxyScale, foxyScale, 0, currentModel); 
             }
         }
 

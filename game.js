@@ -42,8 +42,10 @@ const GameState = {
     foxy: {
       location: 'cam3',
       timer: 0,
-      moveInterval: 8, // 讓 Freddy 稍微難捉摸一點
-      path: ['cam1', 'cam2', 'cam5','cam8','cam4', 'door']
+      moveInterval: 20,
+      phase : 0,
+      runProgress :0,
+      path: ['cam3','cam6','door']
   },
 };
 
@@ -471,6 +473,60 @@ function updateLogic() {
               }
           }
       }
+
+      let isWatchingFoxy = GameState.isMonitorOpen && GameState.currentCam === 'cam3';
+
+      // 🌟 2. 如果「沒在看他」，或是「他已經在走廊狂奔了(phase === 3)」，才讓他計時！
+      // (注意：一旦他衝出海盜灣，你看監視器也攔不住他了！)
+      if (!isWatchingFoxy || GameState.foxy.phase === 3) {
+          GameState.foxy.timer += 0.1; // (請配合你原本增加時間的數值，可能是 += 1 或 += deltaTime)
+      }
+
+      if (GameState.foxy.timer >= GameState.foxy.moveInterval) {
+          GameState.foxy.timer = 0; // 重置計時
+          if (GameState.foxy.phase < 3) {
+              GameState.foxy.phase++;
+              AudioManager.play('Dum'); // 探頭時的音效
+          }
+          if (GameState.foxy.phase === 3) {
+              GameState.foxy.moveInterval = 5;
+              // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+              let oldLocation = GameState.foxy.location;
+              let currentIndex = GameState.foxy.path.indexOf(oldLocation);
+              
+              if (currentIndex < GameState.foxy.path.length - 1) {
+                  let newLocation = GameState.foxy.path[currentIndex + 1];
+                  GameState.foxy.location = newLocation;
+                  
+                   // 播放 Freddy 的笑聲
+                  if(GameState.foxy.location !== 'door') {
+                      AudioManager.play('run');
+                  }
+                  console.log(`⚠️ foxy 從 ${oldLocation} 移動到了 ${newLocation}`);
+                  
+                  // 🌟 4. 同時讓這兩台攝影機黑屏！
+                  GameState.flickerCams = [oldLocation, newLocation];
+                  GameState.flickerTimer = 1.5; 
+              } 
+              else if (GameState.foxy.location === 'door') {
+                  if (GameState.leftDoorClosed) {
+                      GameState.foxy.phase = 0;
+                      GameState.foxy.moveInterval = 50; // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
+                      console.log("🛡️ foxy 撞到門，退回去了！");
+                      AudioManager.play('Foxy_Hit_Door');
+                      GameState.power = Math.max(0, GameState.power - 5);
+                      GameState.foxy.location = 'cam3';
+                      GameState.flickerCams = ['door', 'cam3'];
+                      GameState.flickerTimer = 1.5; 
+                  } else {
+                      AudioManager.play('Jumpscare');
+                      console.log("💀 JUMPSCARE！");
+                      GameState.foxy.location = 'jumpscare';
+                      GameState.power = 0; 
+                  }
+              }
+          }
+      }
   }
 
 
@@ -499,6 +555,25 @@ function updateLogic() {
 }
 
 function gameLoop() {
+
+  // ==========================================
+// 🦊 Foxy 衝刺動畫進度更新 (在 gameLoop 內)
+// ==========================================
+if (GameState.foxy.location === 'cam6') {
+    // 1. 如果進度條還不存在，初始化為 0
+    if (GameState.foxy.runProgress === undefined) {
+        GameState.foxy.runProgress = 0;
+    }
+
+    // 2. 每一幀增加進度 (數字越大衝越快，0.02 大約是 1秒鐘跑完)
+    if (GameState.foxy.runProgress < 1.0) {
+        GameState.foxy.runProgress += 0.02; 
+    }
+} else {
+    // 3. 如果 Foxy 不在走廊了 (例如被門擋回海盜灣，或是跳出 Jumpscare)
+    // 就把進度歸零，為下一次衝刺做準備
+    GameState.foxy.runProgress = 0; 
+}
 
   if (GameState.gameStarted && !GameState.isPowerOut) {
     GameState.fanAngle -= 20; // 每一幀轉動 20 度
@@ -571,6 +646,8 @@ window.onload = async () => {
           AudioManager.load('light', 'sounds/Light.mp3', 0.6); 
           AudioManager.load('light2', 'sounds/Light.mp3', 0.6); 
           AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.4); 
+          AudioManager.load('run', 'sounds/Foxy_Run.mp3', 0.8); 
+          AudioManager.load('Foxy_Hit_Door', 'sounds/Foxy_Hit_Door.mp3', 0.8); 
 
           console.log("所有模型與音效載入完成！");
 
