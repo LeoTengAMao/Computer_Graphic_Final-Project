@@ -357,7 +357,7 @@ function updateUsage() {
 }
 
 // 🌟 修復2：清理了跑到全域範圍的重複程式碼
-let powertimer = 5;
+let powertimer = 10;
 
 function updateLogic() {
     GameState.time += 0.01;
@@ -379,7 +379,7 @@ function updateLogic() {
     // 🔋 扣電邏輯
     if (GameState.power > 0 && powertimer ==0 ) {
         // 每幀扣除電量 (數字可以自己調整難度)
-        powertimer = 5;
+        powertimer = 10;
         GameState.power -= (GameState.usage * 0.02); 
         if (GameState.power < 0) GameState.power = 0;
 
@@ -564,7 +564,7 @@ function updateLogic() {
               else if (GameState.foxy.location === 'door') {
                   if (GameState.leftDoorClosed) {
                       GameState.foxy.phase = 1;
-                      GameState.foxy.moveInterval = 50; // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
+                      GameState.foxy.moveInterval = 200; // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
                       console.log("🛡️ foxy 撞到門，退回去了！");
                       AudioManager.play('Foxy_Hit_Door');
                       GameState.power = Math.max(0, GameState.power - 5);
