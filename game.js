@@ -1,4 +1,3 @@
-// game.js
 const GameState = {
     time: 0,
     obMode: false, // 預設開啟 OB 模式，按 'O' 鍵可以切換
@@ -7,7 +6,7 @@ const GameState = {
     obCam: { x: 0, y: 15, z: 20, pitch: -30, yaw: 0 }, 
     // 紀錄鍵盤按下的狀態
     keys: { w: false, a: false, s: false, d: false, Space: false, shift: false }, // 🌟 修復1：這裡補上逗號了！
-
+    isJumpscaring :false ,
     timeElapsed: 0,    // 總經過秒數
     currentHour: 12,   // 顯示的小時 (從 12 開始)
     hourDuration: 90,  // 設定「一小時」等於現實生活的幾秒 (FNAF1 大約是 86-90秒)
@@ -41,20 +40,20 @@ const GameState = {
     bonnie: {
         location: 'cam1', // 一開始在主舞台
         timer: 0,         
-        moveInterval: 10,  
+        moveInterval: 20,  
         path: ['cam1', 'cam2', 'cam7','cam6', 'door'] 
     },
     freddy: {
         location: 'cam1',
         timer: 0,
-        moveInterval: 16, // 讓 Freddy 稍微難捉摸一點
+        moveInterval: 36, // 讓 Freddy 稍微難捉摸一點
         path: ['cam1', 'cam2', 'cam5','cam8','cam4', 'door']
     },
 
     chica: {
       location: 'cam1',
       timer: 0,
-      moveInterval: 12, 
+      moveInterval: 1, 
       path: ['cam1', 'cam2', 'cam4', 'door']
   },
 
@@ -67,6 +66,84 @@ const GameState = {
       path: ['cam3','cam6','door']
   },
 };
+
+function resetGame() {
+  // 1. 移除 Game Over 或勝利的遮罩層
+  let gameOverOverlay = document.getElementById('game-over-overlay');
+  if (gameOverOverlay) gameOverOverlay.remove();
+  
+  let winOverlay = document.getElementById('win-overlay');
+  if (winOverlay) winOverlay.remove();
+
+  // 2. 停止所有聲音，重新啟動風扇聲
+  AudioManager.stop('Fan');
+  AudioManager.loop('Fan');
+
+  // 3. 大腦狀態大洗牌 (時光倒流)
+  GameState.timeElapsed = 0;
+  GameState.gameEnd = false;
+  GameState.currentHour = 12;
+  GameState.power = 100.0;
+  GameState.usage = 1;
+  powertimer = GameState.powerlosttime; // 重置扣電計時器
+
+  // 4. 重置停電與跳殺狀態
+  GameState.isPowerOut = false;
+  GameState.powerOutPhase = 0;
+  GameState.powerOutTimer = 0;
+  GameState.isJumpscaring = false;
+  
+  // 5. 重置門與燈光
+  GameState.leftDoorClosed = false;
+  GameState.leftLightOn = false;
+  GameState.leftDoorY = 5.0;
+  GameState.rightDoorClosed = false;
+  GameState.rightLightOn = false;
+  GameState.rightDoorY = 5.0;
+
+  // 6. 重置監視器與干擾
+  GameState.isMonitorOpen = false;
+  GameState.currentCam = 'cam1';
+  GameState.flickerTimer = 0;
+  GameState.flickerCams = [];
+  
+  // 7. 視角回正
+  GameState.guardYaw = 0;
+  GameState.targetGuardYaw = 0;
+
+  // 8. 🤖 怪物全部遣返回老家
+  GameState.bonnie.location = 'cam1';
+  GameState.bonnie.timer = 0;
+  
+  GameState.chica.location = 'cam1';
+  GameState.chica.timer = 0;
+  
+  GameState.freddy.location = 'cam1';
+  GameState.freddy.timer = 0;
+  
+  GameState.foxy.location = 'cam3';
+  GameState.foxy.timer = 0;
+  GameState.foxy.phase = 0;
+  GameState.foxy.runProgress = 0;
+
+  // 9. 恢復 HTML UI 顯示
+  document.getElementById('camera-panel').style.display = 'none';
+  document.getElementById('crt-effect').style.display = 'none';
+  document.getElementById('btn-door-left').style.display = 'block';
+  document.getElementById('btn-light-left').style.display = 'block';
+  document.getElementById('btn-door-right').style.display = 'block';
+  document.getElementById('btn-light-right').style.display = 'block';
+  
+  let btnMonitor = document.getElementById('btn-monitor');
+  btnMonitor.style.display = 'block';
+  btnMonitor.innerText = '📺 打開監視器';
+  
+  document.getElementById('time-display').innerText = '12 AM';
+
+  // 10. 重新啟動遊戲時間流逝
+  GameState.gameStarted = true;
+  console.log("🔄 遊戲已秒速重置！祝你好運...");
+}
 
 const AudioManager = {
   sounds: {}, // 存放所有載入的音效
@@ -342,7 +419,7 @@ function setupInput() {
         }
 
         // --- 2. 👮 警衛模式的滑鼠看圖邏輯 (FNAF 經典平移) ---
-        if (!GameState.obMode && !GameState.isMonitorOpen) {
+        if (!GameState.obMode && !GameState.isMonitorOpen && !GameState.isJumpscaring) {
             // 將螢幕 X 座標轉換為比例： 0(最左) ~ 1(最右)
             let screenX = ev.clientX / window.innerWidth;
             
@@ -441,11 +518,14 @@ function updateLogic() {
                         AudioManager.play('Jumpscare');
                         console.log("💀 JUMPSCARE！");
                         GameState.bonnie.location = 'jumpscare';
-                        GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                        GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                        GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
-                        setTimeout(() => {
-                        loseGame('Bonnie');
-                    }, 2500); 
+                       GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
+                        GameState.targetGuardYaw = 0;   // 目標角度設為正前方
+                        GameState.guardYaw = 0;
+                            setTimeout(() => {
+                            loseGame('Bonnie');
+                        }, 5000); 
                     }
                 }
             }
@@ -487,11 +567,14 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
                       GameState.chica.location = 'jumpscare';
-                      GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                      GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                       GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
+                      GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
+                      GameState.targetGuardYaw = 0;   // 目標角度設為正前方
+                      GameState.guardYaw = 0;
                       setTimeout(() => {
                         loseGame('Chica');
-                    }, 2500);
+                    }, 5000);
                   }
               }
           }
@@ -533,11 +616,14 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
                       GameState.freddy.location = 'jumpscare';
-                      GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                      GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                       GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
+                      GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
+                      GameState.targetGuardYaw = 0;   // 目標角度設為正前方
+                      GameState.guardYaw = 0;
                       setTimeout(() => {
                         loseGame('freddy');
-                    }, 2500);
+                    }, 5000);
                     
 
 
@@ -593,9 +679,12 @@ function updateLogic() {
                         GameState.foxy.location = 'jumpscare';
                         GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                         GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
+                        GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
+                        GameState.targetGuardYaw = 0;   // 目標角度設為正前方
+                        GameState.guardYaw = 0;
                         setTimeout(() => {
                           loseGame('Foxy');
-                      }, 2500); 
+                      }, 5000); 
                     }
                 }
             }
@@ -687,6 +776,9 @@ function gameLoop() {
         if (GameState.powerOutTimer > 30) {
             GameState.powerOutPhase = 3; // 進入第三階段：死亡
             GameState.freddy.location = 'jumpscare';
+            GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
+            GameState.targetGuardYaw = 0;   // 目標角度設為正前方
+            GameState.guardYaw = 0;
             AudioManager.play('Jumpscare');
 
             setTimeout(() => {
@@ -711,7 +803,7 @@ if (GameState.foxy.location === 'cam6') {
 
     // 2. 每一幀增加進度 (數字越大衝越快，0.02 大約是 1秒鐘跑完)
     if (GameState.foxy.runProgress < 1.0) {
-        GameState.foxy.runProgress += 0.015; 
+        GameState.foxy.runProgress += 0.01; 
     }
 } else {
     // 3. 如果 Foxy 不在走廊了 (例如被門擋回海盜灣，或是跳出 Jumpscare)
@@ -773,23 +865,27 @@ function winGame() {
   AudioManager.stop('FreddyLaugh'); // 停止風扇聲、跑步聲
   AudioManager.play('6AM'); 
   
-  // 顯示勝利畫面
   const overlay = document.createElement('div');
-  overlay.style.position = 'absolute';
-  overlay.style.top = '0';
-  overlay.style.left = '0';
-  overlay.style.width = '100%';
-  overlay.style.height = '100%';
-  overlay.style.backgroundColor = 'black';
-  overlay.style.color = '#fff';
-  overlay.style.display = 'flex';
-  overlay.style.flexDirection = 'column';
-  overlay.style.justifyContent = 'center';
-  overlay.style.alignItems = 'center';
-  overlay.innerHTML = '<h1 style="font-size: 80px;">6 AM</h1><p>恭喜活過這一晚！</p>';
-  document.body.appendChild(overlay);
+    overlay.id = 'win-overlay'; // 🌟 補上 ID 方便 resetGame 刪除它
+    Object.assign(overlay.style, {
+        position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
+        backgroundColor: 'black', color: '#fff', display: 'flex', flexDirection: 'column',
+        justifyContent: 'center', alignItems: 'center', zIndex: '10000'
+    });
+    
+    // 🌟 幫勝利畫面也加上 Retry 按鈕
+    overlay.innerHTML = `
+        <h1 style="font-size: 80px; margin-bottom: 20px;">6 AM</h1>
+        <p style="font-size: 24px; margin-bottom: 50px;">恭喜活過這一晚！</p>
+        <button id="win-retry-btn" style="padding: 10px 40px; font-size: 24px; cursor: pointer; color: black; background: white; border: none; border-radius: 5px;">PLAY AGAIN</button>
+    `;
+    document.body.appendChild(overlay);
 
-  console.log("🎊 恭喜！你活到了 6 AM！");
+    document.getElementById('win-retry-btn').onclick = () => {
+        resetGame(); 
+    };
+
+    console.log("🎊 恭喜！你活到了 6 AM！");
 }
 
 // ==========================================
@@ -878,7 +974,7 @@ function loseGame(animatronicName) {
     // 🌟 按鈕點擊事件：直接重新整理網頁
     retryBtn.onclick = () => {
         //AudioManager.play('cam'); // 視情況播放一個點擊音效
-        location.reload(); 
+        resetGame();
     };
     overlay.appendChild(retryBtn);
 

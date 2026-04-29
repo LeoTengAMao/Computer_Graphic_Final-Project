@@ -819,24 +819,21 @@ const Renderer = {
                 }
                 this.drawCharacter(projMatrix, viewMatrix, -18, 1, -18, foxyScale, foxyScale, foxyScale, 90, currentModel); 
             }else if (loc === 'cam6') {
-                // 🦊 1. 動畫魔法：每 150 毫秒切換一次左右腳！
-                // 這樣會產生 0, 1, 0, 1 的循環
+                //每 150 毫秒切換一次左右腳！
                 let isLeftFoot = Math.floor(Date.now() / 150) % 2 === 0; 
                 
                 // 根據上面的計算，決定現在要畫哪一個模型
                 let currentModel = isLeftFoot ? Renderer.models.foxyL : Renderer.models.foxyR;
 
-                // 🦊 2. 衝刺位移：計算 Foxy 目前在走廊的深度 (Z 軸)
-                // 假設左走廊盡頭是 Z = -30，警衛室門口是 Z = -5 (請依照你實際的地圖座標微調)
+                //2. 衝刺位移：計算 Foxy 目前在走廊的深度 (Z 軸)
                 let startx = -18;
-                let endx = 0; 
+                let endx = -4; 
                 
                 // 讀取大腦裡的「奔跑進度 (0.0 ~ 1.0)」，算出現在真正的 Z 座標
                 // (如果沒讀到，預設給 0，避免報錯)
                 let currentX = startx + (endx - startx) * (gameState.foxy.runProgress || 0);
 
-                // 🦊 3. 畫出狂奔的 Foxy！
-                // 假設左走廊在 X = -10，高度 Y = 0，轉向面對玩家 (角度視你的模型而定，通常是 0 或 180)
+                // 畫出狂奔的 Foxy
                 if (currentModel) {
                     this.drawCharacter(projMatrix, viewMatrix, currentX, 0, 11, foxyScale, foxyScale, foxyScale, 90, currentModel);
                 }
