@@ -70,7 +70,7 @@ const GameState = {
     chica: {
       location: 'cam1',
       timer: 0,
-      moveInterval: 1, 
+      moveInterval: 18, 
       path: ['cam1', 'cam2', 'cam4', 'door']
   },
 
@@ -777,7 +777,7 @@ function updateLogic() {
                          // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
                         console.log("foxy 撞到門，退回去了！");
                         AudioManager.play('Foxy_Hit_Door');
-                        GameState.foxy.moveInterval = GameState.foxy.movesaved * 1.5; // 暫時增加移動間隔，讓他下一次移動變慢
+                        GameState.foxy.moveInterval = GameState.foxy.movesave * 1.5 ; // 暫時增加移動間隔，讓他下一次移動變慢
                         GameState.power = Math.max(0, GameState.power - 5);
                         GameState.foxy.location = 'cam3';
                         GameState.flickerCams = ['door', 'cam3'];
@@ -840,7 +840,7 @@ function applyDifficulty(aiLevels) {
   // Foxy 的計時器比較慢
   const calcFoxy = (ai) => ai === 0 ? 9999 : Math.max(30, 200 - (ai * 8));
   GameState.foxy.moveInterval = calcFoxy(aiLevels.foxy);
-
+  GameState.foxy.movesave = calcFoxy(aiLevels.foxy);
   console.log("AI 難度已套用:", aiLevels);
 }
 
@@ -1242,8 +1242,8 @@ window.onload = async () => {
                   let dir = parseInt(ev.target.getAttribute('data-dir'));
                   
                   customAI[animatronic] += dir;
-                  if (customAI[animatronic] > 20) customAI[animatronic] = 20;
-                  if (customAI[animatronic] < 0) customAI[animatronic] = 0;
+                  if (customAI[animatronic] > 20) customAI[animatronic] = 0;
+                  if (customAI[animatronic] < 0) customAI[animatronic] = 20;
                   
                   document.getElementById(`ai-val-${animatronic}`).innerText = customAI[animatronic];
               };
