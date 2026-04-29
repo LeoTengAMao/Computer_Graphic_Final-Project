@@ -33,7 +33,7 @@ const Renderer = {
     varying vec3 v_Position; 
     uniform bool u_UseTexture; 
 
-    #define NUM_LIGHTS 11 // 🌟 宣告這個世界最多有 11 盞燈！
+    #define NUM_LIGHTS 11 // 宣告這個世界最多有 11 盞燈！
 
     uniform vec3 u_LightPos[NUM_LIGHTS];   // 11 個位置
     uniform vec3 u_LightColor[NUM_LIGHTS]; // 11 個顏色
@@ -48,7 +48,7 @@ const Renderer = {
         
         vec3 totalDiffuse = vec3(0.0); // 準備一個變數，用來收集所有燈泡的光
 
-        // 🌟 迴圈：計算 10 盞燈的衰減與亮度，全部加在一起
+        // 迴圈：計算 10 盞燈的衰減與亮度，全部加在一起
         for(int i = 0; i < NUM_LIGHTS; i++) {
             vec3 lightDir = u_LightPos[i] - v_Position;
             float distance = length(lightDir);
@@ -328,7 +328,7 @@ const Renderer = {
                 // 停電第二與第三階段：全黑死寂
                 officeR = 0.3; officeG = 0.3; officeB = 0.3;
             }else if (gameState.powerOutPhase === 3){
-                officeR = 0.5; officeG = 0.5; officeB = 0.5;
+                officeR = 1.0; officeG = 1.0; officeB = 1.0;
             }
         }
 
@@ -345,7 +345,7 @@ const Renderer = {
             0.0, 4, 6.0,    // 燈 7 前燈
             -16, 1, 6,    // 燈 8
             18, 2,-16,     // 燈 9 DJ
-            -5.5, 2, 11
+            -1.5, 2, 9
         ]);
 
         // 準備 10 個燈泡的顏色 [R, G, B,  R, G, B...] (總共 30 個數字)
@@ -757,7 +757,7 @@ const Renderer = {
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
                 // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, fScale, fScale,fScale, 0, currentModel); 
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale,fScale, 0, currentModel); 
             }
         }
 

@@ -21,7 +21,7 @@ const GameState = {
     powerOutTimer: 0,     // 停電劇本的專屬計時器，用來控制 Freddy 什麼時候撲過來
 
     // 🌟 遊戲核心狀態
-    powerlosttime: 10,
+    powerlosttime: 20,
     power: 100.0,          // 剩餘電量
     usage: 1,              // 當前耗電等級 (1格預設)
     isMonitorOpen: false,  // 監視器是否打開
@@ -37,7 +37,7 @@ const GameState = {
     flickerCams: [],
 
     gameStarted:false, // 遊戲是否開始了，還在讀取畫面中不能操作
-
+    gameEnd: false, // 遊戲是否已經結束了，結束後停止一切操作
     bonnie: {
         location: 'cam1', // 一開始在主舞台
         timer: 0,         
@@ -103,6 +103,8 @@ const AudioManager = {
           this.sounds[name].currentTime = 0;
       }
   }
+
+  
 };
 
 const FREDDY_MATERIALS = {
@@ -406,7 +408,7 @@ function updateLogic() {
 
 
     // 🤖 怪物 AI 邏輯 (Bonnie)
-    if (GameState.power > 0) { 
+    if (GameState.power > 0 && GameState.gameEnd === false) { 
         GameState.bonnie.timer += 0.01; 
 
         if (GameState.bonnie.timer >= GameState.bonnie.moveInterval) {
@@ -439,6 +441,8 @@ function updateLogic() {
                         AudioManager.play('Jumpscare');
                         console.log("💀 JUMPSCARE！");
                         GameState.bonnie.location = 'jumpscare';
+                        GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                       GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                         setTimeout(() => {
                         loseGame('Bonnie');
                     }, 2500); 
@@ -450,7 +454,7 @@ function updateLogic() {
 
 
      // 🤖 怪物 AI 邏輯 (Chica)
-    if (GameState.power > 0) { 
+    if (GameState.power > 0 && GameState.gameEnd === false) { 
       GameState.chica.timer += 0.01; 
 
       if (GameState.chica.timer >= GameState.chica.moveInterval) {
@@ -483,6 +487,8 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
                       GameState.chica.location = 'jumpscare';
+                      GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                      GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                       setTimeout(() => {
                         loseGame('Chica');
                     }, 2500);
@@ -495,7 +501,7 @@ function updateLogic() {
 
 
 
-    if (GameState.power > 0) { 
+    if (GameState.power > 0 && GameState.gameEnd === false) { 
       GameState.freddy.timer += 0.01; 
 
       if (GameState.freddy.timer >= GameState.freddy.moveInterval) {
@@ -527,6 +533,8 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
                       GameState.freddy.location = 'jumpscare';
+                      GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                      GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                       setTimeout(() => {
                         loseGame('freddy');
                     }, 2500);
@@ -537,7 +545,7 @@ function updateLogic() {
               }
           }
       }
-
+      
       let isWatchingFoxy = GameState.isMonitorOpen && GameState.currentCam === 'cam3';
 
       // 🌟 2. 如果「沒在看他」，或是「他已經在走廊狂奔了(phase === 3)」，才讓他計時！
@@ -545,49 +553,52 @@ function updateLogic() {
       if (!isWatchingFoxy || GameState.foxy.phase === 3) {
           GameState.foxy.timer += 0.1; // (請配合你原本增加時間的數值，可能是 += 1 或 += deltaTime)
       }
-
-      if (GameState.foxy.timer >= GameState.foxy.moveInterval) {
-          GameState.foxy.timer = 0; // 重置計時
-          if (GameState.foxy.phase < 4) {
-              GameState.foxy.phase++;
-              AudioManager.play('Dum'); // 探頭時的音效
-          }
-          if (GameState.foxy.phase ===4 ) {
-              GameState.foxy.moveInterval = 5;
-              // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
-              let oldLocation = GameState.foxy.location;
-              let currentIndex = GameState.foxy.path.indexOf(oldLocation);
-              
-              if (currentIndex < GameState.foxy.path.length - 1) {
-                  let newLocation = GameState.foxy.path[currentIndex + 1];
-                  GameState.foxy.location = newLocation;
-                  
-                   // 播放 Freddy 的笑聲
-                  if(GameState.foxy.location !== 'door') {
-                      AudioManager.play('run');
-                  }
-                  console.log(`⚠️ foxy 從 ${oldLocation} 移動到了 ${newLocation}`);
-                  
-              } 
-              else if (GameState.foxy.location === 'door') {
-                  if (GameState.leftDoorClosed) {
-                      GameState.foxy.phase = 1;
-                      GameState.foxy.moveInterval = 200; // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
-                      console.log("🛡️ foxy 撞到門，退回去了！");
-                      AudioManager.play('Foxy_Hit_Door');
-                      GameState.power = Math.max(0, GameState.power - 5);
-                      GameState.foxy.location = 'cam3';
-                      GameState.flickerCams = ['door', 'cam3'];
-                      GameState.flickerTimer = 1.5; 
-                  } else {
-                      AudioManager.play('Jumpscare');
-                      console.log("💀 JUMPSCARE！");
-                      GameState.foxy.location = 'jumpscare';
-                     setTimeout(() => {
-                        loseGame('Foxy');
-                    }, 2500); 
-                  }
-              }
+      if (GameState.power > 0 && GameState.gameEnd === false) { 
+        if (GameState.foxy.timer >= GameState.foxy.moveInterval) {
+            GameState.foxy.timer = 0; // 重置計時
+            if (GameState.foxy.phase < 4) {
+                GameState.foxy.phase++;
+                AudioManager.play('Dum'); // 探頭時的音效
+            }
+            if (GameState.foxy.phase ===4 ) {
+                GameState.foxy.moveInterval = 5;
+                // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+                let oldLocation = GameState.foxy.location;
+                let currentIndex = GameState.foxy.path.indexOf(oldLocation);
+                
+                if (currentIndex < GameState.foxy.path.length - 1) {
+                    let newLocation = GameState.foxy.path[currentIndex + 1];
+                    GameState.foxy.location = newLocation;
+                    
+                    // 播放 Freddy 的笑聲
+                    if(GameState.foxy.location !== 'door') {
+                        AudioManager.play('run');
+                    }
+                    console.log(`⚠️ foxy 從 ${oldLocation} 移動到了 ${newLocation}`);
+                    
+                } 
+                else if (GameState.foxy.location === 'door') {
+                    if (GameState.leftDoorClosed) {
+                        GameState.foxy.phase = 1;
+                        GameState.foxy.moveInterval = 200; // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
+                        console.log("🛡️ foxy 撞到門，退回去了！");
+                        AudioManager.play('Foxy_Hit_Door');
+                        GameState.power = Math.max(0, GameState.power - 5);
+                        GameState.foxy.location = 'cam3';
+                        GameState.flickerCams = ['door', 'cam3'];
+                        GameState.flickerTimer = 1.5; 
+                    } else {
+                        AudioManager.play('Jumpscare');
+                        console.log("💀 JUMPSCARE！");
+                        GameState.foxy.location = 'jumpscare';
+                        GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                        GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
+                        setTimeout(() => {
+                          loseGame('Foxy');
+                      }, 2500); 
+                    }
+                }
+            }
           }
       }
   }
@@ -633,7 +644,7 @@ function gameLoop() {
 
         // 2. 強制打開所有的門！(請確認變數名稱跟你寫的一致)
         GameState.leftDoorClosed = false; 
-        GameState.rightDoorClosedDoorClosed = false; 
+        GameState.rightDoorClosed = false; 
 
         // 3. 強制關閉玩家的探照燈
         GameState.leftLightOn = false;
@@ -651,7 +662,7 @@ function gameLoop() {
         // 延遲 3 秒後 Freddy 開始唱歌 (音樂盒)
         setTimeout(() => {
             if (GameState.powerOutPhase === 1) {
-                AudioManager.play('MusicBox'); // FNAF 經典鬥牛士之歌
+                AudioManager.loop('MusicBox'); // FNAF 經典鬥牛士之歌
             }
         }, 3000);
 
@@ -664,7 +675,7 @@ function gameLoop() {
 
     if (GameState.powerOutPhase === 1) {
         // 第一階段：Freddy 在門外唱歌。維持大約 12 秒
-        if (GameState.powerOutTimer > 100) {
+        if (GameState.powerOutTimer > 24) {
             GameState.powerOutPhase = 2; // 進入第二階段：全黑
             AudioManager.stop('MusicBox');
             // 可以加一個沉重的腳步聲，代表他走進來了
@@ -672,7 +683,8 @@ function gameLoop() {
     } 
     else if (GameState.powerOutPhase === 2) {
         // 第二階段：徹底死寂。讓玩家在黑暗中恐懼 3 秒
-        if (GameState.powerOutTimer > 75) {
+        AudioManager.stop('MusicBox');
+        if (GameState.powerOutTimer > 30) {
             GameState.powerOutPhase = 3; // 進入第三階段：死亡
             GameState.freddy.location = 'jumpscare';
             AudioManager.play('Jumpscare');
@@ -753,7 +765,12 @@ function winGame() {
   GameState.gameStarted = false;
   
   // 播放 6 AM 的經典鐘聲與小孩子歡呼聲
-  AudioManager.stopAll(); // 停止風扇聲、跑步聲
+  AudioManager.stop('light');
+  AudioManager.stop('light2');
+  AudioManager.stop('Fan');
+  AudioManager.stop('Dum');
+  AudioManager.stop('Foot');
+  AudioManager.stop('FreddyLaugh'); // 停止風扇聲、跑步聲
   AudioManager.play('6AM'); 
   
   // 顯示勝利畫面
@@ -781,7 +798,12 @@ function winGame() {
 function loseGame(animatronicName) {
     // 1. 停止遊戲邏輯迴圈與所有音效
     GameState.gameStarted = false;
-    AudioManager.stopAll(); // 停止風扇聲、跑步聲等
+    AudioManager.stop('light');
+        AudioManager.stop('light2');
+        AudioManager.stop('Fan');
+        AudioManager.stop('Dum');
+        AudioManager.stop('Foot');
+        AudioManager.stop('FreddyLaugh');
 
     // 2. 建立全螢幕遮罩層
     const overlay = document.createElement('div');
