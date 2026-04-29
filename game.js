@@ -178,7 +178,7 @@ function resetGame() {
   
   let btnMonitor = document.getElementById('btn-monitor');
   btnMonitor.style.display = 'block';
-  btnMonitor.innerText = '📺 打開監視器';
+  btnMonitor.innerText = '打開監視器';
   
   document.getElementById('time-display').innerText = '12 AM';
 
