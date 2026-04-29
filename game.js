@@ -15,6 +15,11 @@ const GameState = {
     guardYaw: 0,        // 目前實際角度
     targetGuardYaw: 0,  // 滑鼠希望轉到的目標角度 (-90 到 90)   
 
+    // ⚡ 停電死亡演出系統 (Power Out Sequence)
+    isPowerOut: false,    // 總開關：是否已經完全沒電了
+    powerOutPhase: 0,     // 停電演出階段 (0=正常, 1=閃爍+唱歌, 2=全黑, 3=Jumpscare)
+    powerOutTimer: 0,     // 停電劇本的專屬計時器，用來控制 Freddy 什麼時候撲過來
+
     // 🌟 遊戲核心狀態
     power: 100.0,          // 剩餘電量
     usage: 1,              // 當前耗電等級 (1格預設)
@@ -357,7 +362,7 @@ function updateUsage() {
 }
 
 // 🌟 修復2：清理了跑到全域範圍的重複程式碼
-let powertimer = 10;
+let powertimer = 5;
 
 function updateLogic() {
     GameState.time += 0.01;
@@ -379,7 +384,7 @@ function updateLogic() {
     // 🔋 扣電邏輯
     if (GameState.power > 0 && powertimer ==0 ) {
         // 每幀扣除電量 (數字可以自己調整難度)
-        powertimer = 10;
+        powertimer = 5;
         GameState.power -= (GameState.usage * 0.02); 
         if (GameState.power < 0) GameState.power = 0;
 
@@ -392,19 +397,7 @@ function updateLogic() {
     }
 
     // 停電了！
-    if (GameState.power === 0 && GameState.leftDoorClosed) {
-        AudioManager.stop('fan');         // 電風扇停止！
-        AudioManager.stop('light');  // 如果有開燈，把燈光電流聲也切斷
-        AudioManager.stop('light2');  // 如果有開燈，把燈光電流聲也切斷
-        console.log("停電！門強制打開！");
-        gameState.leftLightOn = false;
-        gameState.rightLightOn = false;
-        GameState.leftDoorClosed = false;
-        GameState.leftLightOn = false;
-        GameState.isMonitorOpen = false;
-        document.getElementById('camera-panel').style.display = 'none';
-        document.getElementById('crt-effect').style.display = 'none';
-    }
+
 
     // 🤖 怪物 AI 邏輯 (Bonnie)
     if (GameState.power > 0) { 
@@ -440,7 +433,9 @@ function updateLogic() {
                         AudioManager.play('Jumpscare');
                         console.log("💀 JUMPSCARE！");
                         GameState.bonnie.location = 'jumpscare';
-                        GameState.power = 0; 
+                        setTimeout(() => {
+                        loseGame('Bonnie');
+                    }, 2500); 
                     }
                 }
             }
@@ -482,7 +477,9 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
                       GameState.chica.location = 'jumpscare';
-                      GameState.power = 0; 
+                      setTimeout(() => {
+                        loseGame('Chica');
+                    }, 2500);
                   }
               }
           }
@@ -524,7 +521,12 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
                       GameState.freddy.location = 'jumpscare';
-                      GameState.power = 0; 
+                      setTimeout(() => {
+                        loseGame('freddy');
+                    }, 2500);
+                    
+
+
                   }
               }
           }
@@ -575,7 +577,9 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
                       GameState.foxy.location = 'jumpscare';
-                      GameState.power = 0; 
+                     setTimeout(() => {
+                        loseGame('Foxy');
+                    }, 2500); 
                   }
               }
           }
@@ -608,6 +612,75 @@ function updateLogic() {
 }
 
 function gameLoop() {
+
+
+    if (GameState.power <= 0) {
+    
+    // 【觸發瞬間】如果才剛沒電，做一次性的狀態重置
+    if (!GameState.isPowerOut) {
+        GameState.isPowerOut = true;
+        GameState.powerOutPhase = 1; // 進入第一階段：閃爍與唱歌
+        GameState.powerOutTimer = 0; // 重置停電計時器
+
+        // 1. 強制收起監視器，回到警衛室視角
+        GameState.isMonitorOpen = false;
+
+        // 2. 強制打開所有的門！(請確認變數名稱跟你寫的一致)
+        GameState.leftDoorClosed = false; 
+        GameState.rightDoorClosedDoorClosed = false; 
+
+        // 3. 強制關閉玩家的探照燈
+        GameState.leftLightOn = false;
+        GameState.rightLightOn = false;
+
+        // 4. 停止所有音效，播放跳電聲與音樂盒
+        AudioManager.stop('light');
+        AudioManager.stop('light2');
+        AudioManager.stop('Fan');
+        AudioManager.stop('Dum');
+        AudioManager.stop('Foot');
+        AudioManager.stop('FreddyLaugh');
+        AudioManager.play('PowerOFF'); // 播放「咚～嗡嗡嗡」的斷電聲 (如果有的話)
+        
+        // 延遲 3 秒後 Freddy 開始唱歌 (音樂盒)
+        setTimeout(() => {
+            if (GameState.powerOutPhase === 1) {
+                AudioManager.play('MusicBox'); // FNAF 經典鬥牛士之歌
+            }
+        }, 3000);
+
+        // 5. 強制把 Freddy 傳送到門口準備嚇人
+        GameState.freddy.location = 'door';
+    }
+
+    // 【時間推移】依照停電計時器，推進劇本
+    GameState.powerOutTimer += (1 / 60); // 假設每秒 60 幀
+
+    if (GameState.powerOutPhase === 1) {
+        // 第一階段：Freddy 在門外唱歌。維持大約 12 秒
+        if (GameState.powerOutTimer > 100) {
+            GameState.powerOutPhase = 2; // 進入第二階段：全黑
+            AudioManager.stop('MusicBox');
+            // 可以加一個沉重的腳步聲，代表他走進來了
+        }
+    } 
+    else if (GameState.powerOutPhase === 2) {
+        // 第二階段：徹底死寂。讓玩家在黑暗中恐懼 3 秒
+        if (GameState.powerOutTimer > 75) {
+            GameState.powerOutPhase = 3; // 進入第三階段：死亡
+            GameState.freddy.location = 'jumpscare';
+            AudioManager.play('Jumpscare');
+
+            setTimeout(() => {
+                    loseGame('Freddy');
+            }, 2500);
+        }
+    }
+}
+
+
+
+
 
   // ==========================================
 // 🦊 Foxy 衝刺動畫進度更新 (在 gameLoop 內)
@@ -671,7 +744,7 @@ if (GameState.foxy.location === 'cam6') {
 }
 
 function winGame() {
-  gameState.gameStarted = false;
+  GameState.gameStarted = false;
   
   // 播放 6 AM 的經典鐘聲與小孩子歡呼聲
   AudioManager.stopAll(); // 停止風扇聲、跑步聲
@@ -694,6 +767,97 @@ function winGame() {
   document.body.appendChild(overlay);
 
   console.log("🎊 恭喜！你活到了 6 AM！");
+}
+
+// ==========================================
+// 💀 輸掉遊戲演出 (Game Over Sequence)
+// ==========================================
+function loseGame(animatronicName) {
+    // 1. 停止遊戲邏輯迴圈與所有音效
+    GameState.gameStarted = false;
+    AudioManager.stopAll(); // 停止風扇聲、跑步聲等
+
+    // 2. 建立全螢幕遮罩層
+    const overlay = document.createElement('div');
+    overlay.id = 'game-over-overlay';
+    
+    // 設定遮罩層樣式
+    Object.assign(overlay.style, {
+        position: 'absolute',
+        top: '0', left: '0',
+        width: '100%', height: '100%',
+        backgroundColor: 'black', // FNAF 輸了就是一片漆黑
+        color: '#b00', // 陰森的暗紅色文字
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: '10000', // 確保蓋在所有東西上面
+        fontFamily: '"Courier New", Courier, monospace', // 使用打字機字體
+        cursor: 'default',
+        overflow: 'hidden'
+    });
+
+    // 3. 加入靜電雜訊背景 (使用 CSS 寫好的 .static-bg)
+    const staticBg = document.createElement('div');
+    staticBg.className = 'static-bg';
+    overlay.appendChild(staticBg);
+
+    // 4. 加入 "Game Over" 主標題
+    const title = document.createElement('h1');
+    title.innerText = "GAME OVER";
+    title.style.fontSize = '80px';
+    title.style.margin = '0 0 10px 0';
+    title.style.textShadow = '0 0 10px #f00'; // 加上紅色霓虹發光效果
+    overlay.appendChild(title);
+
+    // 5. 加入是誰殺了你的小字 (增加一點細節)
+    const subText = document.createElement('p');
+    subText.innerText = `You were killed by ${animatronicName.toUpperCase()}.`;
+    subText.style.fontSize = '18px';
+    subText.style.color = '#666'; // 灰色小字
+    subText.style.margin = '0 0 50px 0';
+    overlay.appendChild(subText);
+
+    // 6. 加入「重新開始」按鈕
+    const retryBtn = document.createElement('button');
+    retryBtn.innerText = "RETRY";
+    
+    // 按鈕樣式
+    Object.assign(retryBtn.style, {
+        padding: '10px 40px',
+        fontSize: '24px',
+        backgroundColor: 'transparent',
+        border: '2px solid #b00',
+        color: '#b00',
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+        outline: 'none'
+    });
+
+    // 按鈕 Hover 效果 (用 JS 模擬 CSS :hover)
+    retryBtn.onmouseover = () => {
+        retryBtn.style.backgroundColor = '#b00';
+        retryBtn.style.color = 'black';
+        retryBtn.style.boxShadow = '0 0 20px #f00';
+    };
+    retryBtn.onmouseout = () => {
+        retryBtn.style.backgroundColor = 'transparent';
+        retryBtn.style.color = '#b00';
+        retryBtn.style.boxShadow = 'none';
+    };
+
+    // 🌟 按鈕點擊事件：直接重新整理網頁
+    retryBtn.onclick = () => {
+        //AudioManager.play('cam'); // 視情況播放一個點擊音效
+        location.reload(); 
+    };
+    overlay.appendChild(retryBtn);
+
+    // 7. 將遮罩層加入 HTML
+    document.body.appendChild(overlay);
+
+    console.log(`💀 Game Over. Killed by ${animatronicName}.`);
 }
 
 async function loadAndParseModel(objUrl, materialDict) {
@@ -769,6 +933,7 @@ window.onload = async () => {
           AudioManager.load('run', 'sounds/Foxy_Run.mp3', 0.8); 
           AudioManager.load('Foxy_Hit_Door', 'sounds/Foxy_Hit_Door.mp3', 0.8); 
           AudioManager.load('6AM', 'sounds/6AM.mp3', 0.8); 
+          AudioManager.load('MusicBox', 'sounds/Music_Box_Theme.mp3', 0.8); 
           console.log("所有模型與音效載入完成！");
 
           // 成功載入才顯示按鈕

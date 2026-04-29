@@ -6,42 +6,65 @@ const Renderer = {
 
     VSHADER_SOURCE: `
     attribute vec4 a_Position;
-    attribute vec4 a_Normal;
+    attribute vec3 a_Normal;
     attribute vec2 a_TexCoord; 
     uniform mat4 u_MvpMatrix;
+    uniform mat4 u_ModelMatrix; // 新增：模型矩陣 (用來算物體在世界裡的真實位置)
     uniform mat4 u_normalMatrix;
     varying vec3 v_Normal;
     varying vec2 v_TexCoord;
+    varying vec3 v_Position;    // 新增：傳遞給片段著色器的世界座標
     void main() {
         gl_Position = u_MvpMatrix * a_Position;
-        v_Normal = normalize(vec3(u_normalMatrix * a_Normal));
+        v_Position = vec3(u_ModelMatrix * a_Position); // 取得真實世界座標
+        v_Normal = normalize(vec3(u_normalMatrix * vec4(a_Normal, 0.0)));
         v_TexCoord = a_TexCoord;
     }
     `,
 
+    // WebGL.js 裡的 FSHADER_SOURCE
     // WebGL.js 裡的 FSHADER_SOURCE
     FSHADER_SOURCE: `
     precision mediump float;
     varying vec3 v_Normal;
     varying vec2 v_TexCoord;
     uniform sampler2D u_Sampler;
-    uniform vec3 u_BaseColor;  // 之前的紅色 (1.0, 0.0, 0.0)
-    uniform bool u_UseTexture; // 開關
-    uniform float u_Alpha;
+    uniform vec3 u_BaseColor; 
+    varying vec3 v_Position; 
+    uniform bool u_UseTexture; 
+
+    #define NUM_LIGHTS 11 // 🌟 宣告這個世界最多有 11 盞燈！
+
+    uniform vec3 u_LightPos[NUM_LIGHTS];   // 11 個位置
+    uniform vec3 u_LightColor[NUM_LIGHTS]; // 11 個顏色
+
     void main() {
-        vec3 light = normalize(vec3(0.5, 1.0, 1.0));
-        float nDotL = max(dot(v_Normal, light), 0.0);
-        
         vec4 color;
         if (u_UseTexture) {
-            // 🌟 如果開關打開，就只用圖片的顏色
             color = texture2D(u_Sampler, v_TexCoord);
         } else {
-            // 🌟 如果開關關閉（畫牆壁時），才用純紅色
             color = vec4(u_BaseColor, 1.0);
         }
         
-        gl_FragColor = vec4(color.rgb * (nDotL * 0.7 + 0.3), color.a);
+        vec3 totalDiffuse = vec3(0.0); // 準備一個變數，用來收集所有燈泡的光
+
+        // 🌟 迴圈：計算 10 盞燈的衰減與亮度，全部加在一起
+        for(int i = 0; i < NUM_LIGHTS; i++) {
+            vec3 lightDir = u_LightPos[i] - v_Position;
+            float distance = length(lightDir);
+            lightDir = normalize(lightDir);
+
+            float nDotL = max(dot(v_Normal, lightDir), 0.0);
+            float attenuation = 1.0 / (1.0 + 0.15 * distance + 0.05 * (distance * distance));
+            
+            totalDiffuse += u_LightColor[i] * color.rgb * nDotL * attenuation;
+        }
+
+        // 環境光 (底色)
+        vec3 ambient = color.rgb * 0.02; 
+        
+        // 最終顏色 = 底色 + 所有燈光的總和
+        gl_FragColor = vec4(ambient + totalDiffuse, color.a);
     }
     `,
 
@@ -148,6 +171,7 @@ const Renderer = {
         this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_UseTexture'), 0);
 
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
         this.gl.uniform3f(this.gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b);
 
@@ -209,6 +233,7 @@ const Renderer = {
 
         // 傳入矩陣
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
 
         // 繪製方塊
@@ -246,6 +271,7 @@ const Renderer = {
         gl.useProgram(this.program);
 
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
 
         let a_Position = gl.getAttribLocation(this.program, 'a_Position');
@@ -279,8 +305,90 @@ const Renderer = {
 
 
     draw: function(gameState) {
-        this.gl.clearColor(0.05, 0.05, 0.05, 1.0);
+        this.gl.clearColor(0.05, 0.05, 0.05, 1.0); // 建議把背景色調暗一點
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
+        this.gl.useProgram(this.program);
+
+
+        // ==========================================
+        // 💡 圖學燈光系統：保安室頂燈
+        // ==========================================
+        // ==========================================
+        // 💡 圖學燈光系統：全區 10 盞燈陣列
+        // ==========================================
+        
+        let officeR = 0.8, officeG = 0.7, officeB = 0.5; // 正常微黃光
+
+        if (gameState.isPowerOut) {
+            if (gameState.powerOutPhase === 1) {
+                // 停電第一階段：Freddy 唱歌時，給予微弱且隨機閃爍的光 (模擬月光或微弱備用電)
+                let flicker = (Math.random() > 0.5) ? 0.15 : 0.02;
+                officeR = flicker; officeG = flicker; officeB = flicker;
+            } else if (gameState.powerOutPhase === 2){
+                // 停電第二與第三階段：全黑死寂
+                officeR = 0.3; officeG = 0.3; officeB = 0.3;
+            }else if (gameState.powerOutPhase === 3){
+                officeR = 0.5; officeG = 0.5; officeB = 0.5;
+            }
+        }
+
+        // 準備 10 個燈泡的座標 [X, Y, Z,  X, Y, Z...] (總共 30 個數字)
+        let lightPositions = new Float32Array([
+            0.0, 4.5, 10.0,   // 燈 0：保安室
+            0.0, 6, -32.0,  // 燈 1：主舞台 (Cam 1)
+            -18.0, 3.5, -18.0,// 燈 2：海盜灣 (Cam 3)
+            -23, 2, 9,  // 燈 3：左側走廊 (Cam 6)
+            10, 4, 2,   // 燈 4：右側走廊 (Cam 4)
+            0, 1, -12,  // 燈 5：用餐區 (Cam 2)
+            // 下面是還沒用到的備用燈泡，先把它們丟到很遠的地方
+            -5.0, 4, 11.25,    // 燈 6 左燈
+            0.0, 4, 6.0,    // 燈 7 前燈
+            -16, 1, 6,    // 燈 8
+            18, 2,-16,     // 燈 9 DJ
+            -5.5, 2, 11
+        ]);
+
+        // 準備 10 個燈泡的顏色 [R, G, B,  R, G, B...] (總共 30 個數字)
+        let lightColors = new Float32Array([
+            officeR, officeG, officeB,  // 燈 0：保安室 (微弱黃光)
+            1.6, 1.6, 2.4,  // 燈 1：主舞台 (帶點詭異的冷藍光)
+            1.0, 0.1, 0.1,  // 燈 2：海盜灣 (壓迫感極重的暗紅光)
+            !gameState.isPowerOut ? 0.7 : 0.0,
+            !gameState.isPowerOut ? 0.7 : 0.0,
+            !gameState.isPowerOut ? 0.7 : 0.0,  // 燈 3：左側走廊 (微弱白光)
+            !gameState.isPowerOut ? 0.7 : 0.0,
+            !gameState.isPowerOut ? 0.7 : 0.0,
+            !gameState.isPowerOut ? 0.7 : 0.0,
+            !gameState.isPowerOut ? 1.5 : 0.0,
+            !gameState.isPowerOut ? 1.5 : 0.0,
+            !gameState.isPowerOut ? 1.5 : 0.0,
+            // 下面是備用的燈，顏色設為 0, 0, 0 (完全不發光，就不會影響畫面)
+            // 燈 3：左門探照燈 (沒電就強制不亮)
+            (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, 
+            (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, 
+            (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, 
+            
+            // 燈 4：前門/窗探照燈 (沒電就強制不亮)
+            (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0, 
+            (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0, 
+            (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0,
+            0.8, 0.7, 0.5,  // 燈 8
+            1.5, 1.5, 1.5 ,  // 燈 9 DJ
+            (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0, // 燈 10 (備用燈)
+            (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0,
+            (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0
+            
+        ]);
+
+        // 把這兩大串陣列一口氣丟給顯示卡！(注意：要用 uniform3fv 而不是 uniform3f)
+        let u_LightPos = this.gl.getUniformLocation(this.program, 'u_LightPos');
+        let u_LightColor = this.gl.getUniformLocation(this.program, 'u_LightColor');
+        
+        this.gl.uniform3fv(u_LightPos, lightPositions);
+        this.gl.uniform3fv(u_LightColor, lightColors);
+
+
+
 
         // 🌟 終極版防護罩攔截器
         // 1. 監視器打開中
@@ -323,7 +431,7 @@ const Renderer = {
                 gameState.obCam.x + fX, gameState.obCam.y + fY, gameState.obCam.z + fZ,
                 0, 1, 0
             );
-        } else if (gameState.isMonitorOpen && gameState.power > 0) {
+        } else if (gameState.isMonitorOpen && gameState.power > 0) {    
             // 📺 監視器模式：根據選擇的鏡頭，把攝影機掛在天花板角落往下看
             switch (gameState.currentCam) {
                 case 'cam1': // 主舞台 (從右前方往左下看舞台)
@@ -636,8 +744,11 @@ const Renderer = {
             }else if(loc === 'cam4'){
                 currentModel = Renderer.models.freddyOut;
                 this.drawCharacter(projMatrix, viewMatrix, 7, 0, 0, fScale, fScale, fScale, 180, currentModel); 
-            }else if (loc === 'door' && gameState.leftLightOn) {
+            }else if (loc === 'door') {
                 currentModel = Renderer.models.freddyAttack;
+                if(gameState.powerOutPhase === 1){
+                    this.drawCharacter(projMatrix, viewMatrix, -0.5, 0, 5, fScale, fScale, fScale, 0, currentModel);
+                }
             }else if (loc === 'jumpscare') {
                 currentModel = Renderer.models.freddyAttack;
                 
@@ -779,6 +890,7 @@ const Renderer = {
         
 
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
         this.gl.uniformMatrix4fv(this.gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
         this.gl.uniform3f(this.gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b);
 
