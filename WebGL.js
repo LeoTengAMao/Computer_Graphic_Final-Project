@@ -2,8 +2,6 @@
 const Renderer = {
     gl: null, canvas: null, program: null, cubeBufferInfo: null, cylinderBufferInfo: null,
 
-        // WebGL.js
-
     VSHADER_SOURCE: `
     attribute vec4 a_Position;
     attribute vec3 a_Normal;
@@ -22,8 +20,6 @@ const Renderer = {
     }
     `,
 
-    // WebGL.js 裡的 FSHADER_SOURCE
-    // WebGL.js 裡的 FSHADER_SOURCE
     FSHADER_SOURCE: `
     precision mediump float;
     varying vec3 v_Normal;
@@ -145,7 +141,7 @@ const Renderer = {
 
         let iBuffer = this.gl.createBuffer();
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, iBuffer);
-        // 🌟 注意：頂點數超過 256，必須用 Uint16Array (UNSIGNED_SHORT)
+        // 注意：頂點數超過 256，必須用 Uint16Array (UNSIGNED_SHORT)
         this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
 
         this.cylinderBufferInfo = { 
@@ -156,7 +152,7 @@ const Renderer = {
         };
     },
 
-    // 🌟 技能 2：專門畫圓柱體的函數 (跟 drawBlock 幾乎一樣，只是換了 Buffer)
+    // 技能 2：專門畫圓柱體的函數 (跟 drawBlock 幾乎一樣，只是換了 Buffer)
     drawCylinder: function(proj, view, tx, ty, tz, sx, sy, sz, r, g, b) {
         let modelMatrix = new Matrix4();
         modelMatrix.translate(tx, ty, tz);
@@ -187,7 +183,7 @@ const Renderer = {
         this.gl.enableVertexAttribArray(a_Normal);
 
         this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, this.cylinderBufferInfo.indexBuffer);
-        // 🌟 呼叫 GPU 繪製 (使用 UNSIGNED_SHORT)
+        // 呼叫 GPU 繪製 (使用 UNSIGNED_SHORT)
         this.gl.drawElements(this.gl.TRIANGLES, this.cylinderBufferInfo.indexCount, this.gl.UNSIGNED_SHORT, 0);
     },
 
@@ -203,7 +199,7 @@ const Renderer = {
         };
         image.src = url;
         
-        // 🌟 核心修正：一定要把它存進字典裡，drawFreddy 才找得到！
+        // 核心修正：一定要把它存進字典裡，drawFreddy 才找得到！
         this.textures[url] = texture; 
         
         return texture;
@@ -211,7 +207,7 @@ const Renderer = {
 
     textures: {},
 
-    // 🌟 專門為了電風扇發明的新技能：畫出會自轉的方塊！
+    // 專門為了電風扇發明的新技能：畫出會自轉的方塊！
     drawRotatedBlock: function(proj, view, tx, ty, tz, sx, sy, sz, angle, r, g, b) {
         let modelMatrix = new Matrix4();
         modelMatrix.translate(tx, ty, tz);      // 3. 移動到桌上
@@ -251,7 +247,7 @@ const Renderer = {
         gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_BYTE, 0);
     },
 
-    // 🌟 改名為 drawCharacter，因為它現在什麼角色都能畫了！
+    // 改名為 drawCharacter，因為它現在什麼角色都能畫了！
     drawCharacter: function(proj, view, tx, ty, tz, sx, sy, sz, ry, components) {
         if (!components) return; 
 
@@ -284,7 +280,7 @@ const Renderer = {
         for (let i = 0; i < components.length; i++) {
             let comp = components[i];
             
-            // 🌟 終極修正：直接讀取載入時存好的 texturePath，不再依賴 FREDDY_MATERIALS！
+            // 終極修正：直接讀取載入時存好的 texturePath，不再依賴 FREDDY_MATERIALS！
             let imgPath = comp.texturePath; 
             
             gl.activeTexture(gl.TEXTURE0);
@@ -310,12 +306,10 @@ const Renderer = {
         this.gl.useProgram(this.program);
 
 
-        // ==========================================
-        // 💡 圖學燈光系統：保安室頂燈
-        // ==========================================
-        // ==========================================
-        // 💡 圖學燈光系統：全區 10 盞燈陣列
-        // ==========================================
+        // 圖學燈光系統：保安室頂燈
+
+        // 圖學燈光系統：全區 10 盞燈陣列
+  
         
         let officeR = 0.8, officeG = 0.7, officeB = 0.5; // 正常微黃光
 
@@ -390,7 +384,6 @@ const Renderer = {
 
 
 
-        // 🌟 終極版防護罩攔截器
         // 1. 監視器打開中
         // 2. 還在干擾時間內
         // 3. 有電  
@@ -405,7 +398,7 @@ const Renderer = {
             this.gl.clearColor(0.0, 0.0, 0.0, 1.0); 
             this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
             
-            // 🌟 直接 return，不把地圖畫出來！
+            // 直接 return，不把地圖畫出來！
             return; 
         }
 
@@ -415,7 +408,7 @@ const Renderer = {
         let viewMatrix = new Matrix4();
         projMatrix.setPerspective(60, this.canvas.width / this.canvas.height, 0.1, 100);
 
-        // 🌟 核心：切換 OB 模式與一般模式
+        // 切換 OB 模式與一般模式
         if (gameState.obMode) {
             // OB 模式：自由飛行攝影機 (利用三角函數計算看向的方向)
             let pitchRad = gameState.obCam.pitch * Math.PI / 180;
@@ -432,7 +425,7 @@ const Renderer = {
                 0, 1, 0
             );
         } else if (gameState.isMonitorOpen && gameState.power > 0) {    
-            // 📺 監視器模式：根據選擇的鏡頭，把攝影機掛在天花板角落往下看
+            // 監視器模式：根據選擇的鏡頭，把攝影機掛在天花板角落往下看
             switch (gameState.currentCam) {
                 case 'cam1': // 主舞台 (從右前方往左下看舞台)
                     viewMatrix.setLookAt(8, 6, -18,  0, 2, -30,  0, 1, 0);
@@ -480,10 +473,11 @@ const Renderer = {
         }
 
         // --- 開始捏地圖 (Blockout) ---
+
         // 使用 drawBlock(proj, view, X, Y, Z, 縮放X, 縮放Y, 縮放Z, 顏色R, 顏色G, 顏色B)
-        // ==========================================
-        // 📍 你的警衛室 (Security Office) Blockout
-        // ==========================================
+      
+        // 警衛室 (Security Office) Blockout
+
 
         // 1. 警衛室地板 (灰色)
         this.drawBlock(projMatrix, viewMatrix, 0, 0, 11,  4, 0.1, 3,  0.3, 0.3, 0.3);
@@ -493,7 +487,7 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix, -1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 左桌腳
         this.drawBlock(projMatrix, viewMatrix,  1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 右桌腳
 
-        // 3. 🛡️ 正前方牆壁 (包含 Window 和 Door 1) - Z=9
+        // 3. 正前方牆壁 (包含 Window 和 Door 1) - Z=9
         // 窗戶左邊的牆
         this.drawBlock(projMatrix, viewMatrix, -3.0, 2.5, 8,  0.75, 2.5, 0.2,  0.2, 0.3, 0.3); 
         // 窗戶下方的牆 (窗台，這樣上面就空出來變成窗戶了)
@@ -509,7 +503,7 @@ const Renderer = {
 
         this.drawBlock(projMatrix, viewMatrix, 2, gameState.rightDoorY, 8, 1.25 ,2 , 0.15,  0.2, 0.25, 0.3);
 
-        // 4. 🛡️ 左邊牆壁 (包含 Door 2) - X=-4
+        // 4. 左邊牆壁 (包含 Door 2) - X=-4
         // 門前方的牆
         this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 9,  0.2, 2.5, 1,  0.2, 0.3, 0.3);
         // 門後方的牆
@@ -517,15 +511,14 @@ const Renderer = {
         // Door 2 的門樑
         this.drawBlock(projMatrix, viewMatrix, -4, 4, 11.25,  0.2, 1, 1.3, 0.2, 0.3, 0.3);
 
-        // ==========================================
-        // 🚪 繪製左邊的金屬防護門 (會上下滑動)
-        // ==========================================
-        // X = -4 (緊貼左牆), Y = 大腦算出來的高度, Z = 11.25 (剛好在門洞的正中間)
-        // Sx = 0.15 (薄薄的一片金屬), Sy = 1.5 (總高3), Sz = 1.1 (寬度剛好塞滿門洞)
-        // 顏色使用偏藍的深灰色 (0.2, 0.25, 0.3) 來模擬金屬材質
+        
+        // 繪製左邊的金屬防護門 (會上下滑動)
+       
+       
+        
         this.drawBlock(projMatrix, viewMatrix, -4, gameState.leftDoorY, 11.25,  0.15, 1.5, 1.1,  0.2, 0.25, 0.3);
 
-        // 5. 🛡️ 右邊牆壁 (包含 Vent 通風管) - X=4
+        // 5. 右邊牆壁 (包含 Vent 通風管) - X=4
         this.drawBlock(projMatrix, viewMatrix, 4, 2.5, 11,  0.2, 2.5, 3,  0.2, 0.3, 0.3); // 右邊主牆
         // 用一個黑色的深色方塊假裝是通風管的開口 (Z=13 稍微靠後)
         this.drawBlock(projMatrix, viewMatrix, 3.8, 1.0, 12,  0.3, 1, 1,  0.05, 0.05, 0.05); 
@@ -533,9 +526,8 @@ const Renderer = {
         // 6. 警衛室背後的牆壁 - Z=15
         this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 14,  4, 2.5, 0.2,  0.2, 0.3, 0.3);
 
-        // ==========================================
-        // 主地圖 (根據草圖建立)
-        // ==========================================
+        
+        // 主地圖 (根據草圖建立
 
         // --- 1. 全區大地板 ---
         // 從警衛室前方一直延伸到舞台的深灰色大地板
@@ -553,7 +545,7 @@ const Renderer = {
         // 南邊牆壁 (警衛室前方的牆壁，連接左右兩側牆壁)
         this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 15,  25, 2.5, 0.5,   0.5, 0.15, 0.15);
 
-        // --- 3. 🍕 主要用餐區 (Dining Area) ---
+        // --- 3. 主要用餐區 (Dining Area) ---
         // 你的 4 張長桌 (棕色)
         this.drawBlock(projMatrix, viewMatrix, -7.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
 
@@ -577,22 +569,22 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix, 18, 1, -16,  1 , 1, 1,    1, 0.5, 1);
 
 
-        // --- 4. 🎤 主舞台 (Stage) ---
+        // --- 4. 主舞台 (Stage) ---
         // 舞台底座 (稍高一點的木板)
         this.drawBlock(projMatrix, viewMatrix, 0, 0.5, -32,  10, 0.5, 2.5,   0.3, 0.2, 0.1);
         // 舞台背板/布幕 (深色)
         this.drawBlock(projMatrix, viewMatrix, 0, 3, -34.5,  8.5, 4, 0.2,   0.1, 0.1, 0.1);
 
-        // --- 5. 🦊 海盜灣 (Pirate Cove - 左上角) ---
+        // --- 5.  海盜灣 (Pirate Cove - 左上角) ---
         // 舞台底座 (現在是真的圓形了！半徑由 sx 和 sz 決定)
         this.drawCylinder(projMatrix, viewMatrix, -18, 0.5, -18,  3.0, 0.5, 3.0,  0.2, 0.1, 0.3);
         
-        // 舞台布幕 (使用原本的 drawBlock 來做一個背板)
+        // 舞台布幕 
         this.drawBlock(projMatrix, viewMatrix, -18, 2, -21,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
         this.drawBlock(projMatrix, viewMatrix, -21.5, 2, -18,  0.2, 2.5, 3.5,   0.3, 0.1, 0.4);
         this.drawBlock(projMatrix, viewMatrix, -18, 2, -15,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
 
-        // --- 6. 🔦 連接走廊 (Corridors) ---
+        // --- 6. 連接走廊 (Corridors) ---
 
         // 區隔用餐區與警衛室走廊的南邊牆壁 (Z = -2)
         this.drawBlock(projMatrix, viewMatrix, -11, 2.5, 2,  8, 2.5, 0.2,  0.5, 0.15, 0.15); // 左半邊牆
@@ -632,9 +624,9 @@ const Renderer = {
         this.drawBlock(projMatrix, viewMatrix, 14, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
         this.drawBlock(projMatrix, viewMatrix, 12.5, 1.5, 1,  1.3, 1.3 , 0.1 , 0, 0, 0); 
 
-        // ==========================================
-        // 📍 辦公室電風扇 (極簡旋轉版)
-        // ==========================================
+
+        // 辦公室電風扇 (極簡旋轉版)
+   
         let fX = 0.8, fY = 1.1, fZ = 10.1; 
 
         // 1. 底盤與支柱 (靜態)
@@ -644,7 +636,7 @@ const Renderer = {
         // 2. 馬達頭 (靜態)
         this.drawBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ, 0.08, 0.08, 0.1, 0.2, 0.2, 0.2);
 
-        // 🌟 3. 會旋轉的十字葉片！(使用新的 drawRotatedBlock，並傳入 gameState.fanAngle)
+        // 3. 會旋轉的十字葉片！(使用新的 drawRotatedBlock，並傳入 gameState.fanAngle)
         
         // 垂直葉片 ( | 形狀 )
         this.drawRotatedBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ + 0.11, 0.02, 0.15, 0.01, gameState.fanAngle, 0.05, 0.05, 0.05);
@@ -655,14 +647,11 @@ const Renderer = {
 
 
 
-        // ==========================================
-        // 🤖 繪製怪物 (Bonnie) - 真實 3D 空間實體版
-        // ==========================================
+  
+        // 繪製怪物 (Bonnie) - 真實 3D 空間實體版
+    
         let bLoc = gameState.bonnie.location;
         
-        // 我們給 Bonnie 一個稍微高一點的方塊 (高4，寬1.6)，看起來比較像站著的機器人
-
-        // 🌟 防呆檢查：確定大腦 (game.js) 已經把 Bonnie 的模型載入完畢了
         if (Renderer.models && Renderer.models.bonnieNormal) {
             let bLoc = gameState.bonnie.location;
             //let bLoc = 'jumpscare';
@@ -672,32 +661,31 @@ const Renderer = {
             let bScale = 0.04; 
 
             if (bLoc === 'cam1') {
-                // 🎸 在舞台上 (稍微靠左邊一點)
+                // 在舞台上 
                 // 參數：投影, 視角, X, Y, Z, 縮放X, 縮放Y, 縮放Z, 旋轉Y角, 模型檔案
                 currentBonnie = Renderer.models.bonnieNormal;
                 this.drawCharacter(projMatrix, viewMatrix, -4, 1, -32, bScale, bScale, bScale, 0, currentBonnie); 
             } 
             else if (bLoc === 'cam2') {
-                // 🍕 在用餐區長桌旁 (稍微轉個 45 度角看著鏡頭會比較恐怖)
+                // 在用餐區長桌旁 
                 currentBonnie = Renderer.models.bonnieCam2;
                 this.drawCharacter(projMatrix, viewMatrix, 0, 1, -11, bScale, bScale, bScale, -30, currentBonnie); 
             } 
             else if (bLoc === 'cam4') {
-                // 🔦 在右側走廊 / 通風管入口附近
+                
                 this.drawCharacter(projMatrix, viewMatrix, 8, 1, 2, bScale, bScale, bScale, -45, currentBonnie); 
             }
             else if (bLoc === 'cam6') {
-                // 🔦 在右側走廊 / 通風管入口附近
+                
                 currentBonnie = Renderer.models.bonnieCam6;
                 this.drawCharacter(projMatrix, viewMatrix, -18, 0, 13, bScale, bScale, bScale, 90, currentBonnie); 
             } 
             else if (bLoc === 'cam7') {
-                // 🔦 在右側走廊 / 通風管入口附近
+                
                 currentBonnie = Renderer.models.bonnieCam7;
                 this.drawCharacter(projMatrix, viewMatrix, -11, 0, 7.8, bScale, bScale, bScale, 145, currentBonnie); 
             }  
             else if (bLoc === 'door') {
-                // 🚨 關鍵：她已經走到門邊了！只有玩家開燈時才畫出來
                 if (gameState.leftLightOn) {
                     // 畫在左邊門口的窗外，旋轉 90 度讓她面向辦公室裡面
                     // 這裡的縮放設定為 0.6，配合門口的大小
@@ -705,13 +693,12 @@ const Renderer = {
                 }
             } 
             else if (bLoc === 'jumpscare') {
-                // 💀 突發驚嚇！
+
                 // 利用原本的三角函數做出瘋狂抖動的效果
                 currentBonnie = Renderer.models.bonnieAttack;
                 let shakeX = Math.sin(gameState.time * 50) * 0.1;
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
-                
-                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
+        
                 this.drawCharacter(projMatrix, viewMatrix, shakeX, -1 + shakeY, 11, 0.03, 0.03, 0.03, 0, currentBonnie); 
             }
         }
@@ -724,12 +711,12 @@ const Renderer = {
 
             //let loc = 'jumpscare';
             let fScale = 1.8;
-            // 決定要用哪一個模型！(預設為普通站姿)
+            // 決定要用哪一個模型！
             let currentModel = Renderer.models.freddyNormal; 
             
             if (loc === 'cam1') {
                 // 畫在舞台上
-                // 🌟 修正 2：使用 currentModel 變數
+    
                 currentModel = Renderer.models.freddyNormal;
                 this.drawCharacter(projMatrix, viewMatrix, 3, 1, -32, fScale, fScale, fScale, 0, currentModel); 
             }else if(loc === 'cam2'){
@@ -756,7 +743,7 @@ const Renderer = {
                 let shakeX = Math.sin(gameState.time * 50) * 0.1;
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
-                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
+               
                 this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale,fScale, 0, currentModel); 
             }
         }
@@ -766,7 +753,7 @@ const Renderer = {
 
             //let loc = 'cam4';
             let CScale = 0.045;
-            // 決定要用哪一個模型！(預設為普通站姿)
+            // 決定要用哪一個模型
             let currentModel = Renderer.models.chicaNormal; 
             
             if (loc === 'cam1') {
@@ -794,7 +781,6 @@ const Renderer = {
                 let shakeX = Math.sin(gameState.time * 50) * 0.1;
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
-                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
                 this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, CScale, CScale, CScale, 0, currentModel); 
             }
         }
@@ -804,7 +790,7 @@ const Renderer = {
 
             //let loc = 'jumpscare';
             let foxyScale = 0.2;
-            // 決定要用哪一個模型！(預設為普通站姿)
+         
             let currentModel = Renderer.models.foxyNormal; 
             
             if (loc === 'cam3') {
@@ -844,7 +830,7 @@ const Renderer = {
                 let shakeX = Math.sin(gameState.time * 50) * 0.1;
                 let shakeY = Math.cos(gameState.time * 70) * 0.1;
                 
-                // 把模型放到玩家臉上 (Z=9)，並且稍微放大一點 (2.5) 增加壓迫感
+             
                 this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, foxyScale, foxyScale, foxyScale, 0, currentModel); 
             }
         }
@@ -853,7 +839,7 @@ const Renderer = {
 
 
     initAttributeVariable: function(a_attribute, buffer) {
-        // 🌟 終極防呆：如果這個零件沒有資料 (buffer 為 undefined)，就直接跳過，不報錯！
+        //如果這個零件沒有資料 (buffer 為 undefined)，就直接跳過，不報錯
         if (!buffer) return; 
         
         this.gl.bindBuffer(this.gl.ARRAY_BUFFER, buffer);
@@ -861,7 +847,7 @@ const Renderer = {
         this.gl.enableVertexAttribArray(a_attribute);
     },
 
-    // 🌟 蓋房子的積木函式：把原本 1x1 的方塊位移、縮放、上色
+    // 蓋房子的積木函式：把原本 1x1 的方塊位移、縮放、上色
     drawBlock: function(proj, view, tx, ty, tz, sx, sy, sz, r, g, b) {
         let modelMatrix = new Matrix4();
         modelMatrix.translate(tx, ty, tz);
@@ -876,7 +862,7 @@ const Renderer = {
         let gl = this.gl;
         gl.useProgram(this.program);
 
-        // 🌟 核心修正：強制關閉貼圖開關
+        // 核心修正：強制關閉貼圖開關
         let u_UseTexture = gl.getUniformLocation(this.program, 'u_UseTexture');
         gl.uniform1i(u_UseTexture, 0); // 0 代表 False，不使用貼圖
 

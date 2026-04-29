@@ -1,7 +1,7 @@
 
 const NIGHT_DATA = {
-  1: { bonnie: 0, chica: 0, freddy: 0, foxy: 0 }, // 第一夜最簡單 (AI 皆為 0 不會動)
-  2: { bonnie: 3, chica: 1, freddy: 0, foxy: 1 },
+  1: { bonnie: 1, chica: 1, freddy: 0, foxy: 0 }, // 第一夜最簡單 (AI 皆為 0 不會動)
+  2: { bonnie: 3, chica: 1, freddy: 0, foxy: 0 },
   3: { bonnie: 4, chica: 5, freddy: 1, foxy: 2 },
   4: { bonnie: 6, chica: 7, freddy: 2, foxy: 5 },
   5: { bonnie: 10, chica: 12, freddy: 5, foxy: 7 }
@@ -18,7 +18,7 @@ const GameState = {
     // OB 攝影機狀態
     obCam: { x: 0, y: 15, z: 20, pitch: -30, yaw: 0 }, 
     // 紀錄鍵盤按下的狀態
-    keys: { w: false, a: false, s: false, d: false, Space: false, shift: false }, // 🌟 修復1：這裡補上逗號了！
+    keys: { w: false, a: false, s: false, d: false, Space: false, shift: false },
     isJumpscaring :false ,
     timeElapsed: 0,    // 總經過秒數
     currentHour: 12,   // 顯示的小時 (從 12 開始)
@@ -28,12 +28,12 @@ const GameState = {
     guardYaw: 0,        // 目前實際角度
     targetGuardYaw: 0,  // 滑鼠希望轉到的目標角度 (-90 到 90)   
 
-    // ⚡ 停電死亡演出系統 (Power Out Sequence)
+    //停電死亡演出系統 (Power Out Sequence)
     isPowerOut: false,    // 總開關：是否已經完全沒電了
     powerOutPhase: 0,     // 停電演出階段 (0=正常, 1=閃爍+唱歌, 2=全黑, 3=Jumpscare)
     powerOutTimer: 0,     // 停電劇本的專屬計時器，用來控制 Freddy 什麼時候撲過來
 
-    // 🌟 遊戲核心狀態
+    //遊戲核心狀態
     powerlosttime: 20,
     power: 100.0,          // 剩餘電量
     usage: 1,              // 當前耗電等級 (1格預設)
@@ -45,7 +45,7 @@ const GameState = {
     rightDoorClosed: false,
     rightLightOn: false,
     rightDoorY: 5.0, // 右門的物理高度
-    // 🌟 新增：專屬頻道的干擾系統
+    // 新增：專屬頻道的干擾系統
     flickerTimer: 0,     
     flickerCams: [],
 
@@ -104,7 +104,7 @@ function returnToMenu() {
   document.getElementById('main-menu').style.display = 'flex';
   document.getElementById('custom-night-panel').style.display = 'none'; // 確保自訂面板關起來
 
-  console.log("🏠 已回到主選單！");
+  console.log("已回到主選單！");
 }
 
 function resetGame() {
@@ -151,7 +151,7 @@ function resetGame() {
   GameState.guardYaw = 0;
   GameState.targetGuardYaw = 0;
 
-  // 8. 🤖 怪物全部遣返回老家
+  // 8. 怪物全部遣返回老家
   GameState.bonnie.location = 'cam1';
   GameState.bonnie.timer = 0;
   
@@ -182,7 +182,7 @@ function resetGame() {
 
   // 10. 重新啟動遊戲時間流逝
   GameState.gameStarted = true;
-  console.log("🔄 遊戲已秒速重置！祝你好運...");
+  console.log("遊戲已秒速重置！祝你好運...");
 }
 
 const AudioManager = {
@@ -198,7 +198,7 @@ const AudioManager = {
   // 2. 播放一次 (例如：腳步聲、按鈕聲)
   play: function(name) {
     if (this.sounds[name]) {
-        // 🌟 關鍵：複製一份「影分身」來播放，才不會干擾原本正在播的
+        //複製一份「影分身」來播放，才不會干擾原本正在播的
         let soundClone = this.sounds[name].cloneNode();
         soundClone.volume = this.sounds[name].volume; // 繼承原本設定的音量
         soundClone.play().catch(e => console.warn("等待玩家點擊後才能播放音效", e));
@@ -322,7 +322,7 @@ async function loadOBJModel(url) {
     const text = await response.text();
     
     let pTemp = [], tTemp = [], nTemp = [];
-    let groups = {}; // 🌟 用來存放不同材質的分組
+    let groups = {}; //用來存放不同材質的分組
     let currentMaterial = "default";
 
     const lines = text.split('\n');
@@ -332,7 +332,7 @@ async function loadOBJModel(url) {
         else if (parts[0] === 'vt') tTemp.push(+parts[1], +parts[2]);
         else if (parts[0] === 'vn') nTemp.push(+parts[1], +parts[2], +parts[3]);
         else if (parts[0] === 'usemtl') { 
-            // 🌟 當看到 usemtl 時，切換目前的材質分組
+            // 當看到 usemtl 時，切換目前的材質分組
             currentMaterial = parts[1];
             if (!groups[currentMaterial]) groups[currentMaterial] = [];
         }
@@ -388,20 +388,20 @@ function setupInput() {
         if(GameState.powerOutPhase > 0) return;
         GameState.leftLightOn = !GameState.leftLightOn;
         if (GameState.leftLightOn) {
-          // 如果燈是開的 👉 循環播放電流聲
+          // 如果燈是開的循環播放電流聲
           if (GameState.bonnie.location === 'door' &&  GameState.EDoorLCD === 0) {
             AudioManager.play('ED');
             GameState.EDoorLCD = 1;
           }
           AudioManager.loop('light2');
       } else {
-          // 如果燈是關的 👉 停止播放電流聲
+          // 如果燈是關的停止播放電流聲
           AudioManager.stop('light2');
       }
         updateUsage();
     }
 
-    // 🌟 2. 新增右側按鈕監聽
+    //2. 新增右側按鈕監聽
     document.getElementById('btn-door-right').onclick = () => {
         if(GameState.powerOutPhase > 0) return;
         GameState.rightDoorClosed = !GameState.rightDoorClosed;
@@ -412,20 +412,20 @@ function setupInput() {
         if(GameState.powerOutPhase > 0) return;
         GameState.rightLightOn = !GameState.rightLightOn;
         if (GameState.rightLightOn) {
-          // 如果燈是開的 👉 循環播放電流聲
+          // 如果燈是開的循環播放電流聲
           AudioManager.loop('light');
           if (GameState.chica.location === 'door' &&  GameState.EDoorRCD === 0) {
             AudioManager.play('ED');
             GameState.EDoorRCD = 1;
           }
       } else {
-          // 如果燈是關的 👉 停止播放電流聲
+          // 如果燈是關的停止播放電流聲
           AudioManager.stop('light');
       }
         updateUsage();
     };
 
-    // 📺 打開/關閉監視器
+    //打開/關閉監視器
     document.getElementById('btn-monitor').onclick = () => {
         if(GameState.powerOutPhase > 0) return;
         GameState.isMonitorOpen = !GameState.isMonitorOpen;
@@ -437,7 +437,7 @@ function setupInput() {
         document.getElementById('btn-light-left').style.display = GameState.isMonitorOpen ? 'none' : 'block';
         document.getElementById('btn-door-right').style.display = GameState.isMonitorOpen ? 'none' : 'block';
         document.getElementById('btn-light-right').style.display = GameState.isMonitorOpen ? 'none' : 'block';
-        document.getElementById('btn-monitor').innerText = GameState.isMonitorOpen ? '📺 放下監視器' : '📺 打開監視器';
+        document.getElementById('btn-monitor').innerText = GameState.isMonitorOpen ? ' 放下監視器' : ' 打開監視器';
         if(GameState.isMonitorOpen == true){
           AudioManager.play('camup');
         }
@@ -445,7 +445,7 @@ function setupInput() {
         updateUsage();
     };
 
-    // 📷 切換攝影機頻道
+    //切換攝影機頻道
     let camBtns = document.querySelectorAll('.cam-btn');
     camBtns.forEach(btn => {
         btn.onclick = (ev) => {
@@ -497,7 +497,7 @@ function setupInput() {
             return; // OB 模式下不執行後面的警衛轉頭邏輯
         }
 
-        // --- 2. 👮 警衛模式的滑鼠看圖邏輯 (FNAF 經典平移) ---
+        // --- 2. 警衛模式的滑鼠看圖邏輯 (FNAF 經典平移) ---
         if (!GameState.obMode && !GameState.isMonitorOpen && !GameState.isJumpscaring) {
             // 將螢幕 X 座標轉換為比例： 0(最左) ~ 1(最右)
             let screenX = ev.clientX / window.innerWidth;
@@ -519,13 +519,12 @@ function updateUsage() {
     let usage = 1;
     if (GameState.leftDoorClosed) usage += 1;
     if (GameState.leftLightOn) usage += 1;
-    if (GameState.rightDoorClosed) usage += 1; // 🌟 加入計算
-    if (GameState.rightLightOn) usage += 1;   // 🌟 加入計算
+    if (GameState.rightDoorClosed) usage += 1; 
+    if (GameState.rightLightOn) usage += 1;   
     if (GameState.isMonitorOpen) usage += 1;
     GameState.usage = usage;
 }
 
-// 🌟 修復2：清理了跑到全域範圍的重複程式碼
 let powertimer = GameState.powerlosttime;
 
 function updateLogic() {
@@ -533,7 +532,7 @@ function updateLogic() {
     powertimer -= 1;
     GameState.guardYaw += (GameState.targetGuardYaw - GameState.guardYaw) * 0.01;
 
-    // 🌟 門的滑動物理動畫 (Lerp)
+    // 門的滑動物理動畫 (Lerp)
     // 如果玩家想關門，目標高度就是 1.5 (剛好碰到地板)；如果想開門，目標就是 5.0 (藏進天花板)
     let targetLeftY = GameState.leftDoorClosed ? 1.5 : 5.0;
     GameState.leftDoorY += (targetLeftY - GameState.leftDoorY) * 0.2;
@@ -545,7 +544,7 @@ function updateLogic() {
         GameState.flickerTimer -= 0.01; 
     }
 
-    // 🔋 扣電邏輯
+    // 扣電邏輯
     if (GameState.power > 0 && powertimer ==0 ) {
         // 每幀扣除電量 (數字可以自己調整難度)
         powertimer = GameState.powerlosttime;
@@ -563,7 +562,7 @@ function updateLogic() {
     // 停電了！
 
 
-    // 🤖 怪物 AI 邏輯 (Bonnie)
+    //怪物 AI 邏輯 (Bonnie)
     if (GameState.power > 0 && GameState.gameEnd === false) { 
         GameState.bonnie.timer += 0.01; 
 
@@ -571,7 +570,7 @@ function updateLogic() {
             GameState.bonnie.timer = 0; // 重置計時
 
             if (Math.random() > 0.4) {
-                // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+                //3. 紀錄離開的房間 (old) 與抵達的房間 (new)
                 let oldLocation = GameState.bonnie.location;
                 let currentIndex = GameState.bonnie.path.indexOf(oldLocation);
                 
@@ -580,25 +579,25 @@ function updateLogic() {
                     GameState.bonnie.location = newLocation;
                     
                     if(GameState.bonnie.location == 'cam6')AudioManager.play('Foot'); // 播放腳步聲
-                    console.log(`⚠️ Bonnie 從 ${oldLocation} 移動到了 ${newLocation}`);
+                    console.log(`Bonnie 從 ${oldLocation} 移動到了 ${newLocation}`);
                     
-                    // 🌟 4. 同時讓這兩台攝影機黑屏！
+                    //4. 同時讓這兩台攝影機黑屏！
                     GameState.flickerCams = [oldLocation, newLocation];
                     GameState.flickerTimer = 1.5; 
                 } 
                 else if (GameState.bonnie.location === 'door') {
                     if (GameState.leftDoorClosed) {
                         AudioManager.play('Foot');
-                        console.log("🛡️ Bonnie 撞到門，退回去了！");
+                        console.log("Bonnie 撞到門，退回去了！");
                         GameState.bonnie.location = 'cam2';
                         GameState.flickerCams = ['door', 'cam2'];
                         GameState.flickerTimer = 1.5; 
                         GameState.EDoorLCD = 0;
                     } else {
                         AudioManager.play('Jumpscare');
-                        console.log("💀 JUMPSCARE！");
+                        console.log("JUMPSCARE！");
                         GameState.bonnie.location = 'jumpscare';
-                        GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                        GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                        GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                        GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
                         GameState.targetGuardYaw = 0;   // 目標角度設為正前方
@@ -613,7 +612,7 @@ function updateLogic() {
     }
 
 
-     // 🤖 怪物 AI 邏輯 (Chica)
+     // 怪物 AI 邏輯 (Chica)
     if (GameState.power > 0 && GameState.gameEnd === false) { 
       GameState.chica.timer += 0.01; 
 
@@ -621,7 +620,7 @@ function updateLogic() {
           GameState.chica.timer = 0; // 重置計時
 
           if (Math.random() > 0.4) {
-              // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+              // 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
               let oldLocation = GameState.chica.location;
               let currentIndex = GameState.chica.path.indexOf(oldLocation);
               
@@ -630,25 +629,25 @@ function updateLogic() {
                   GameState.chica.location = newLocation;
                   
                   if(GameState.chica.location == 'cam4')AudioManager.play('Foot'); // 播放腳步聲
-                  console.log(`⚠️ chica 從 ${oldLocation} 移動到了 ${newLocation}`);
+                  console.log(`chica 從 ${oldLocation} 移動到了 ${newLocation}`);
                   
-                  // 🌟 4. 同時讓這兩台攝影機黑屏！
+                  // 4. 同時讓這兩台攝影機黑屏！
                   GameState.flickerCams = [oldLocation, newLocation];
                   GameState.flickerTimer = 1.5; 
               } 
               else if (GameState.chica.location === 'door') {
                   if (GameState.rightDoorClosed) {
                       AudioManager.play('Foot');
-                      console.log("🛡️ chica 撞到門，退回去了！");
+                      console.log(" chica 撞到門，退回去了！");
                       GameState.chica.location = 'cam1';
                       GameState.flickerCams = ['door', 'cam1'];
                       GameState.flickerTimer = 1.5; 
                       GameState.EDoorRCD = 0;
                   } else {
                       AudioManager.play('Jumpscare');
-                      console.log("💀 JUMPSCARE！");
+                      console.log(" JUMPSCARE！");
                       GameState.chica.location = 'jumpscare';
-                      GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                      GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                       GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                       GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
                       GameState.targetGuardYaw = 0;   // 目標角度設為正前方
@@ -672,7 +671,7 @@ function updateLogic() {
           GameState.freddy.timer = 0; // 重置計時
 
           if (Math.random() > 0.4) {
-              // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+              // 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
               let oldLocation = GameState.freddy.location;
               let currentIndex = GameState.freddy.path.indexOf(oldLocation);
               
@@ -681,9 +680,9 @@ function updateLogic() {
                   GameState.freddy.location = newLocation;
                   
                   AudioManager.play('FreddyLaugh'); // 播放 Freddy 的笑聲
-                  console.log(`⚠️ freddy 從 ${oldLocation} 移動到了 ${newLocation}`);
+                  console.log(`freddy 從 ${oldLocation} 移動到了 ${newLocation}`);
                   
-                  // 🌟 4. 同時讓這兩台攝影機黑屏！
+                  // 4. 同時讓這兩台攝影機黑屏！
                   GameState.flickerCams = [oldLocation, newLocation];
                   GameState.flickerTimer = 1.5; 
               } 
@@ -691,15 +690,15 @@ function updateLogic() {
                   AudioManager.play('FreddyLaugh');
                   setTimeout(() => {
                     if (GameState.rightDoorClosed) {
-                      console.log("🛡️ freddy 撞到門，退回去了！");
+                      console.log(" freddy 撞到門，退回去了！");
                       GameState.freddy.location = 'cam1';
                       GameState.flickerCams = ['door', 'cam1'];
                       GameState.flickerTimer = 1.5; 
                   } else {
                       AudioManager.play('Jumpscare');
-                      console.log("💀 JUMPSCARE！");
+                      console.log("JUMPSCARE！");
                       GameState.freddy.location = 'jumpscare';
-                      GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                      GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                       GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                       GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
                       GameState.targetGuardYaw = 0;   // 目標角度設為正前方
@@ -721,7 +720,7 @@ function updateLogic() {
       
       let isWatchingFoxy = GameState.isMonitorOpen && GameState.currentCam === 'cam3';
 
-      // 🌟 2. 如果「沒在看他」，或是「他已經在走廊狂奔了(phase === 3)」，才讓他計時！
+      // 2. 如果「沒在看他」，或是「他已經在走廊狂奔了(phase === 3)」，才讓他計時！
       // (注意：一旦他衝出海盜灣，你看監視器也攔不住他了！)
       if (!isWatchingFoxy || GameState.foxy.phase === 3) {
           GameState.foxy.timer += 0.1; // (請配合你原本增加時間的數值，可能是 += 1 或 += deltaTime)
@@ -735,7 +734,7 @@ function updateLogic() {
             }
             if (GameState.foxy.phase ===4 ) {
                 GameState.foxy.moveInterval = 4;
-                // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
+                // 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
                 let oldLocation = GameState.foxy.location;
                 let currentIndex = GameState.foxy.path.indexOf(oldLocation);
                 
@@ -747,14 +746,14 @@ function updateLogic() {
                     if(GameState.foxy.location !== 'door') {
                         AudioManager.play('run');
                     }
-                    console.log(`⚠️ foxy 從 ${oldLocation} 移動到了 ${newLocation}`);
+                    console.log(`foxy 從 ${oldLocation} 移動到了 ${newLocation}`);
                     
                 } 
                 else if (GameState.foxy.location === 'door') {
                     if (GameState.leftDoorClosed) {
                         GameState.foxy.phase = 1;
                          // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
-                        console.log("🛡️ foxy 撞到門，退回去了！");
+                        console.log("foxy 撞到門，退回去了！");
                         AudioManager.play('Foxy_Hit_Door');
                         GameState.foxy.moveInterval = GameState.foxy.movesaved * 1.5; // 暫時增加移動間隔，讓他下一次移動變慢
                         GameState.power = Math.max(0, GameState.power - 5);
@@ -763,9 +762,9 @@ function updateLogic() {
                         GameState.flickerTimer = 1.5; 
                     } else {
                         AudioManager.play('Jumpscare');
-                        console.log("💀 JUMPSCARE！");
+                        console.log(" JUMPSCARE！");
                         GameState.foxy.location = 'jumpscare';
-                        GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                        GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                         GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                         GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
                         GameState.targetGuardYaw = 0;   // 目標角度設為正前方
@@ -819,7 +818,7 @@ function applyDifficulty(aiLevels) {
   const calcFoxy = (ai) => ai === 0 ? 9999 : Math.max(30, 200 - (ai * 8));
   GameState.foxy.moveInterval = calcFoxy(aiLevels.foxy);
 
-  console.log("🔥 AI 難度已套用:", aiLevels);
+  console.log("AI 難度已套用:", aiLevels);
 }
 
 function gameLoop() {
@@ -897,9 +896,8 @@ function gameLoop() {
 
 
 
-  // ==========================================
-// 🦊 Foxy 衝刺動畫進度更新 (在 gameLoop 內)
-// ==========================================
+
+// Foxy 衝刺動畫進度更新 (在 gameLoop 內)
 if (GameState.foxy.location === 'cam6') {
     // 1. 如果進度條還不存在，初始化為 0
     if (GameState.foxy.runProgress === undefined) {
@@ -971,14 +969,14 @@ function winGame() {
   AudioManager.play('6AM'); 
   
   const overlay = document.createElement('div');
-    overlay.id = 'win-overlay'; // 🌟 補上 ID 方便 resetGame 刪除它
+    overlay.id = 'win-overlay'; // 補上 ID 方便 resetGame 刪除它
     Object.assign(overlay.style, {
         position: 'absolute', top: '0', left: '0', width: '100%', height: '100%',
         backgroundColor: 'black', color: '#fff', display: 'flex', flexDirection: 'column',
         justifyContent: 'center', alignItems: 'center', zIndex: '10000'
     });
     
-    // 🌟 幫勝利畫面也加上 Retry 按鈕
+    // 幫勝利畫面也加上 Retry 按鈕
     overlay.innerHTML = `
         <h1 style="font-size: 80px; margin-bottom: 20px;">6 AM</h1>
         <p style="font-size: 24px; margin-bottom: 50px;">恭喜活過這一晚！</p>
@@ -990,12 +988,11 @@ function winGame() {
         returnToMenu();
     };
 
-    console.log("🎊 恭喜！你活到了 6 AM！");
+    console.log("恭喜！你活到了 6 AM！");
 }
 
-// ==========================================
-// 💀 輸掉遊戲演出 (Game Over Sequence)
-// ==========================================
+
+// 輸掉遊戲演出 (Game Over Sequence)
 function loseGame(animatronicName) {
     // 1. 停止遊戲邏輯迴圈與所有音效
     GameState.gameStarted = false;
@@ -1076,7 +1073,7 @@ function loseGame(animatronicName) {
         retryBtn.style.boxShadow = 'none';
     };
 
-    // 🌟 按鈕點擊事件：直接重新整理網頁
+    // 按鈕點擊事件：直接重新整理網頁
     retryBtn.onclick = () => {
         //AudioManager.play('cam'); // 視情況播放一個點擊音效
         returnToMenu();
@@ -1086,7 +1083,7 @@ function loseGame(animatronicName) {
     // 7. 將遮罩層加入 HTML
     document.body.appendChild(overlay);
 
-    console.log(`💀 Game Over. Killed by ${animatronicName}.`);
+    console.log(`Game Over. Killed by ${animatronicName}.`);
 }
 
 async function loadAndParseModel(objUrl, materialDict) {
@@ -1099,7 +1096,7 @@ async function loadAndParseModel(objUrl, materialDict) {
         const geo = obj.geometries[i];
         let o = initVertexBufferForLaterUse(Renderer.gl, geo.data.position, geo.data.normal, geo.data.texcoord);
         
-        // 🌟 關鍵：直接把這塊零件專屬的「圖片路徑」存在身上！
+        //關鍵：直接把這塊零件專屬的「圖片路徑」存在身上！
         o.texturePath = materialDict[geo.material] || "models/default.png";
         components.push(o);
         
@@ -1120,14 +1117,14 @@ window.onload = async () => {
       Renderer.models = {}; 
 
       try {
-          // 🌟 把它們包在 try 裡面
+          //Freddy
           Renderer.models.freddyNormal = await loadAndParseModel('models/Freddy.obj', FREDDY_MATERIALS);
           Renderer.models.freddyVent = await loadAndParseModel('models/Freddy_Climb.obj', FREDDY_MATERIALS);
           Renderer.models.freddyDown = await loadAndParseModel('models/Freddy_down.obj', FREDDY_MATERIALS);
           Renderer.models.freddyOut = await loadAndParseModel('models/Freddy_Out.obj', FREDDY_MATERIALS);
           Renderer.models.freddyAttack = await loadAndParseModel('models/freddy__Attack.obj', FREDDY_MATERIALS);
 
-          // 🚨 這裡請確認你的實際路徑！
+          //bonnie
           Renderer.models.bonnieNormal = await loadAndParseModel('models/Bonnie.obj', BONNIE_MATERIALS);
           Renderer.models.bonnieCam2 = await loadAndParseModel('models/Bonnie_cam2.obj', BONNIE_MATERIALS);
           Renderer.models.bonnieCam6 = await loadAndParseModel('models/Bonnie_Standby.obj', BONNIE_MATERIALS);
@@ -1140,11 +1137,13 @@ window.onload = async () => {
           Renderer.models.foxyP3 = await loadAndParseModel('models/Foxy_P3.obj', FOXY_MATERIALS);
           Renderer.models.foxyL = await loadAndParseModel('models/FoxyLeft.obj', FOXY_MATERIALS);
           Renderer.models.foxyR = await loadAndParseModel('models/FoxyRight.obj', FOXY_MATERIALS);
-
+          //Chica
           Renderer.models.chicaNormal = await loadAndParseModel('models/Chica.obj', CHICA_MATERIALS);
           Renderer.models.chicaCam2 = await loadAndParseModel('models/Chica_Cam2.obj', CHICA_MATERIALS);
           Renderer.models.chicaCam4 = await loadAndParseModel('models/Chica_Cam4.obj', CHICA_MATERIALS);
           Renderer.models.chicaAttack = await loadAndParseModel('models/Chica_Attack.obj', CHICA_MATERIALS);
+          //Mangle
+
 
           // 載入音效 (你的 AudioManager 程式碼)
           AudioManager.load('Jumpscare', 'sounds/Jumpscare.mp3', 1.0); 
@@ -1171,20 +1170,18 @@ window.onload = async () => {
           AudioManager.load('phone5', 'sounds/Night5.mp3', 1.0); 
           console.log("所有模型與音效載入完成！");
 
-          // 🌟 1. 隱藏載入中文字
+          // 1. 隱藏載入中文字
           document.getElementById('loading-text').style.display = 'none';
 
-          // 🌟 2. 隱藏舊版的 NEW GAME 按鈕 (因為我們現在有更精緻的選單了)
+          // 2. 隱藏舊版的 NEW GAME 按鈕 (因為我們現在有更精緻的選單了)
           let btnStart = document.getElementById('btn-start');
           if (btnStart) btnStart.style.display = 'none';
 
-          // 🌟 3. 直接顯示主選單 (Night 1 ~ 5)
+          //3. 直接顯示主選單 (Night 1 ~ 5)
           let mainMenu = document.getElementById('main-menu');
           if (mainMenu) mainMenu.style.display = 'flex';
 
-          // ==========================================
-          // 🌟 4. 綁定所有選單按鈕 (解除封印，直接綁定)
-          // ==========================================
+          // 4. 綁定所有選單按鈕 (解除封印，直接綁定)
           
           // 綁定 Night 1 ~ 5 按鈕
           document.querySelectorAll('.menu-btn').forEach(btn => {
@@ -1239,7 +1236,7 @@ window.onload = async () => {
           }
 
       } catch (error) {
-          // 💀 如果載入失敗，會跑到這裡！
+          // 如果載入失敗，會跑到這裡！
           console.error("載入崩潰！詳細錯誤：", error);
           
           // 把錯誤訊息直接顯示在畫面上，方便除錯
