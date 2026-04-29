@@ -21,6 +21,7 @@ const GameState = {
     powerOutTimer: 0,     // 停電劇本的專屬計時器，用來控制 Freddy 什麼時候撲過來
 
     // 🌟 遊戲核心狀態
+    powerlosttime: 10,
     power: 100.0,          // 剩餘電量
     usage: 1,              // 當前耗電等級 (1格預設)
     isMonitorOpen: false,  // 監視器是否打開
@@ -227,12 +228,14 @@ let lastMouseY = 0;
 function setupInput() {
     // UI 按鈕監聽
     document.getElementById('btn-door-left').onclick = () => {
+        if(GameState.powerOutPhase > 0) return; // 停電後不能操作門了
         GameState.leftDoorClosed = !GameState.leftDoorClosed;
         AudioManager.play('Door'); // 播放開關門音效
         updateUsage(); // 開關門會影響耗電
     };
 
     document.getElementById('btn-light-left').onclick = () => {
+        if(GameState.powerOutPhase > 0) return;
         GameState.leftLightOn = !GameState.leftLightOn;
         if (GameState.leftLightOn) {
           // 如果燈是開的 👉 循環播放電流聲
@@ -246,11 +249,13 @@ function setupInput() {
 
     // 🌟 2. 新增右側按鈕監聽
     document.getElementById('btn-door-right').onclick = () => {
+        if(GameState.powerOutPhase > 0) return;
         GameState.rightDoorClosed = !GameState.rightDoorClosed;
         AudioManager.play('Door'); // 播放開關門音效
         updateUsage();
     };
     document.getElementById('btn-light-right').onclick = () => {
+        if(GameState.powerOutPhase > 0) return;
         GameState.rightLightOn = !GameState.rightLightOn;
         if (GameState.rightLightOn) {
           // 如果燈是開的 👉 循環播放電流聲
@@ -264,6 +269,7 @@ function setupInput() {
 
     // 📺 打開/關閉監視器
     document.getElementById('btn-monitor').onclick = () => {
+        if(GameState.powerOutPhase > 0) return;
         GameState.isMonitorOpen = !GameState.isMonitorOpen;
         
         // 控制 UI 顯示與隱藏
@@ -362,7 +368,7 @@ function updateUsage() {
 }
 
 // 🌟 修復2：清理了跑到全域範圍的重複程式碼
-let powertimer = 5;
+let powertimer = GameState.powerlosttime;
 
 function updateLogic() {
     GameState.time += 0.01;
@@ -384,7 +390,7 @@ function updateLogic() {
     // 🔋 扣電邏輯
     if (GameState.power > 0 && powertimer ==0 ) {
         // 每幀扣除電量 (數字可以自己調整難度)
-        powertimer = 5;
+        powertimer = GameState.powerlosttime;
         GameState.power -= (GameState.usage * 0.02); 
         if (GameState.power < 0) GameState.power = 0;
 

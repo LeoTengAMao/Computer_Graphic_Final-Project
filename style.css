@@ -1,0 +1,17 @@
+/* ==========================================
+   💀 Game Over 靜電雜訊背景動畫
+   ========================================== */
+@keyframes static-anim {
+    0% { background-position: 0px 0px; }
+    100% { background-position: 100px 100px; } /* 讓背景圖片微幅位移 */
+}
+
+.static-bg {
+    background-image: url('https://imgur.com/vH5tY6z.png'); /* FNAF Static 雜訊圖 */
+    background-size: cover;
+    animation: static-anim 0.1s infinite linear; /* 極快速循環，產生閃爍感 */
+    opacity: 0.15; /* 淡淡的蓋在黑色背景上即可 */
+    position: absolute;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: -1; /* 放在文字後面 */
+}
