@@ -93,8 +93,6 @@ function returnToMenu() {
   let winOverlay = document.getElementById('win-overlay');
   if (winOverlay) winOverlay.remove();
 
-  // 2. 停止所有音效
-  if(AudioManager.stopAll) AudioManager.stopAll();
 
   // 3. 把變數全部重置洗乾淨 (呼叫你寫好的 resetGame)
   if(typeof resetGame === 'function') resetGame();
@@ -189,7 +187,7 @@ function resetGame() {
 
 const AudioManager = {
   sounds: {}, // 存放所有載入的音效
-
+  currentPhone: null,
   // 1. 載入音效
   load: function(name, url, volume = 1.0) {
       let audio = new Audio(url);
@@ -221,6 +219,28 @@ const AudioManager = {
           this.sounds[name].pause();
           this.sounds[name].currentTime = 0;
       }
+  },
+
+  playPhone: function(name) {
+    if (this.sounds[name]) {
+        this.currentPhone = this.sounds[name]; // 把電話拿起來
+        this.currentPhone.currentTime = 0;
+        this.currentPhone.play().catch(e => console.warn(e));
+        
+        // 當電話自然掛斷 (播完) 時，把 MUTE 按鈕自動藏起來！
+        this.currentPhone.onended = () => {
+            let btn = document.getElementById('btn-mute-call');
+            if (btn) btn.style.display = 'none';
+        };
+    }
+  },
+
+  stopPhone: function() {
+    if (this.currentPhone) {
+        this.currentPhone.pause();
+        this.currentPhone.currentTime = 0;
+        this.currentPhone = null;
+    }
   }
 
   
@@ -354,6 +374,15 @@ function setupInput() {
         AudioManager.play('Door'); // 播放開關門音效
         updateUsage(); // 開關門會影響耗電
     };
+
+    let btnMute = document.getElementById('btn-mute-call');
+    if (btnMute) {
+        btnMute.onclick = () => {
+            AudioManager.play('cam'); // 隨意播一個點擊音效 (可選)
+            AudioManager.stopPhone(); // 掛斷電話！
+            btnMute.style.display = 'none'; // 按鈕瞬間消失
+        }
+    }
 
     document.getElementById('btn-light-left').onclick = () => {
         if(GameState.powerOutPhase > 0) return;
@@ -1134,7 +1163,12 @@ window.onload = async () => {
           AudioManager.load('run', 'sounds/Foxy_Run.mp3', 0.8); 
           AudioManager.load('Foxy_Hit_Door', 'sounds/Foxy_Hit_Door.mp3', 0.8); 
           AudioManager.load('6AM', 'sounds/6AM.mp3', 0.8); 
-          AudioManager.load('MusicBox', 'sounds/Music_Box_Theme.mp3', 0.8); 
+          AudioManager.load('MusicBox', 'sounds/Music_Box_Theme.mp3', 0.8);
+          AudioManager.load('phone1', 'sounds/Night1.mp3', 1.0);
+          AudioManager.load('phone2', 'sounds/Night2.mp3', 1.0); 
+          AudioManager.load('phone3', 'sounds/Night3.mp3', 1.0);
+          AudioManager.load('phone4', 'sounds/Night4.mp3', 1.0); 
+          AudioManager.load('phone5', 'sounds/Night5.mp3', 1.0); 
           console.log("所有模型與音效載入完成！");
 
           // 🌟 1. 隱藏載入中文字
@@ -1228,6 +1262,21 @@ function startGame() {
   }
   
   AudioManager.loop('Fan'); // 啟動風扇聲
+
+
+    // Phone Guy 語音演出
+    // 把目前的夜數組合成字串 (例如 'phone1')
+    let phoneName = 'phone' + currentSelectedNight; 
+    let btnMute = document.getElementById('btn-mute-call');
+    
+    // 如果不是自訂夜晚，而且這個音效真的存在，我們就播出來！
+    if (currentSelectedNight !== 'custom' && AudioManager.sounds[phoneName]) {
+        AudioManager.playPhone(phoneName);
+        if (btnMute) btnMute.style.display = 'block'; // 顯示 MUTE 按鈕
+    } else {
+        // 自訂夜晚，或是沒有語音的話，確保按鈕藏起來
+        if (btnMute) btnMute.style.display = 'none';
+    }
   gameLoop();  // 開始迴圈
 }
 
