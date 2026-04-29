@@ -1,3 +1,16 @@
+
+const NIGHT_DATA = {
+  1: { bonnie: 0, chica: 0, freddy: 0, foxy: 0 }, // 第一夜最簡單 (AI 皆為 0 不會動)
+  2: { bonnie: 3, chica: 1, freddy: 0, foxy: 1 },
+  3: { bonnie: 4, chica: 5, freddy: 1, foxy: 2 },
+  4: { bonnie: 6, chica: 7, freddy: 2, foxy: 5 },
+  5: { bonnie: 10, chica: 12, freddy: 5, foxy: 7 }
+};
+
+let customAI = { bonnie: 20, chica: 20, freddy: 20, foxy: 20 };
+let currentSelectedNight = 1; // 紀錄目前玩的是第幾夜
+
+
 const GameState = {
     time: 0,
     obMode: false, // 預設開啟 OB 模式，按 'O' 鍵可以切換
@@ -10,7 +23,8 @@ const GameState = {
     timeElapsed: 0,    // 總經過秒數
     currentHour: 12,   // 顯示的小時 (從 12 開始)
     hourDuration: 90,  // 設定「一小時」等於現實生活的幾秒 (FNAF1 大約是 86-90秒)
-    
+    EDoorLCD:0,
+    EDoorRCD:0,
     guardYaw: 0,        // 目前實際角度
     targetGuardYaw: 0,  // 滑鼠希望轉到的目標角度 (-90 到 90)   
 
@@ -37,6 +51,9 @@ const GameState = {
 
     gameStarted:false, // 遊戲是否開始了，還在讀取畫面中不能操作
     gameEnd: false, // 遊戲是否已經結束了，結束後停止一切操作
+
+
+
     bonnie: {
         location: 'cam1', // 一開始在主舞台
         timer: 0,         
@@ -63,9 +80,34 @@ const GameState = {
       moveInterval: 200,
       phase : 0,
       runProgress :0,
+      movesave:0,
       path: ['cam3','cam6','door']
   },
 };
+
+function returnToMenu() {
+  // 1. 移除 Game Over 或勝利的黑色遮罩層
+  let gameOverOverlay = document.getElementById('game-over-overlay');
+  if (gameOverOverlay) gameOverOverlay.remove();
+  
+  let winOverlay = document.getElementById('win-overlay');
+  if (winOverlay) winOverlay.remove();
+
+  // 2. 停止所有音效
+  if(AudioManager.stopAll) AudioManager.stopAll();
+
+  // 3. 把變數全部重置洗乾淨 (呼叫你寫好的 resetGame)
+  if(typeof resetGame === 'function') resetGame();
+  GameState.gameStarted = false; // 確保遊戲迴圈停止運作
+
+  // 4. 畫面大切換：隱藏遊戲 UI，重新顯示封面與主選單
+  document.getElementById('ui-layer').style.display = 'none';
+  document.getElementById('start-screen').style.display = 'flex';
+  document.getElementById('main-menu').style.display = 'flex';
+  document.getElementById('custom-night-panel').style.display = 'none'; // 確保自訂面板關起來
+
+  console.log("🏠 已回到主選單！");
+}
 
 function resetGame() {
   // 1. 移除 Game Over 或勝利的遮罩層
@@ -77,7 +119,7 @@ function resetGame() {
 
   // 2. 停止所有聲音，重新啟動風扇聲
   AudioManager.stop('Fan');
-  AudioManager.loop('Fan');
+
 
   // 3. 大腦狀態大洗牌 (時光倒流)
   GameState.timeElapsed = 0;
@@ -86,7 +128,7 @@ function resetGame() {
   GameState.power = 100.0;
   GameState.usage = 1;
   powertimer = GameState.powerlosttime; // 重置扣電計時器
-
+  GameState.gameStarted = false; // 等待 resetGame 完成後再啟動遊戲迴圈
   // 4. 重置停電與跳殺狀態
   GameState.isPowerOut = false;
   GameState.powerOutPhase = 0;
@@ -318,6 +360,10 @@ function setupInput() {
         GameState.leftLightOn = !GameState.leftLightOn;
         if (GameState.leftLightOn) {
           // 如果燈是開的 👉 循環播放電流聲
+          if (GameState.bonnie.location === 'door' &&  GameState.EDoorLCD === 0) {
+            AudioManager.play('ED');
+            GameState.EDoorLCD = 1;
+          }
           AudioManager.loop('light2');
       } else {
           // 如果燈是關的 👉 停止播放電流聲
@@ -339,6 +385,10 @@ function setupInput() {
         if (GameState.rightLightOn) {
           // 如果燈是開的 👉 循環播放電流聲
           AudioManager.loop('light');
+          if (GameState.chica.location === 'door' &&  GameState.EDoorRCD === 0) {
+            AudioManager.play('ED');
+            GameState.EDoorRCD = 1;
+          }
       } else {
           // 如果燈是關的 👉 停止播放電流聲
           AudioManager.stop('light');
@@ -514,6 +564,7 @@ function updateLogic() {
                         GameState.bonnie.location = 'cam2';
                         GameState.flickerCams = ['door', 'cam2'];
                         GameState.flickerTimer = 1.5; 
+                        GameState.EDoorLCD = 0;
                     } else {
                         AudioManager.play('Jumpscare');
                         console.log("💀 JUMPSCARE！");
@@ -563,6 +614,7 @@ function updateLogic() {
                       GameState.chica.location = 'cam1';
                       GameState.flickerCams = ['door', 'cam1'];
                       GameState.flickerTimer = 1.5; 
+                      GameState.EDoorRCD = 0;
                   } else {
                       AudioManager.play('Jumpscare');
                       console.log("💀 JUMPSCARE！");
@@ -607,7 +659,9 @@ function updateLogic() {
                   GameState.flickerTimer = 1.5; 
               } 
               else if (GameState.freddy.location === 'door') {
-                  if (GameState.rightDoorClosed) {
+                  AudioManager.play('FreddyLaugh');
+                  setTimeout(() => {
+                    if (GameState.rightDoorClosed) {
                       console.log("🛡️ freddy 撞到門，退回去了！");
                       GameState.freddy.location = 'cam1';
                       GameState.flickerCams = ['door', 'cam1'];
@@ -628,6 +682,10 @@ function updateLogic() {
 
 
                   }
+                    }, 3000);
+                  }
+
+                  
               }
           }
       }
@@ -647,7 +705,7 @@ function updateLogic() {
                 AudioManager.play('Dum'); // 探頭時的音效
             }
             if (GameState.foxy.phase ===4 ) {
-                GameState.foxy.moveInterval = 5;
+                GameState.foxy.moveInterval = 4;
                 // 🌟 3. 紀錄離開的房間 (old) 與抵達的房間 (new)
                 let oldLocation = GameState.foxy.location;
                 let currentIndex = GameState.foxy.path.indexOf(oldLocation);
@@ -656,7 +714,7 @@ function updateLogic() {
                     let newLocation = GameState.foxy.path[currentIndex + 1];
                     GameState.foxy.location = newLocation;
                     
-                    // 播放 Freddy 的笑聲
+                    
                     if(GameState.foxy.location !== 'door') {
                         AudioManager.play('run');
                     }
@@ -666,9 +724,10 @@ function updateLogic() {
                 else if (GameState.foxy.location === 'door') {
                     if (GameState.leftDoorClosed) {
                         GameState.foxy.phase = 1;
-                        GameState.foxy.moveInterval = 200; // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
+                         // 門會讓 Foxy 暫時退縮，減慢下一次移動的速度
                         console.log("🛡️ foxy 撞到門，退回去了！");
                         AudioManager.play('Foxy_Hit_Door');
+                        GameState.foxy.moveInterval = GameState.foxy.movesaved * 1.5; // 暫時增加移動間隔，讓他下一次移動變慢
                         GameState.power = Math.max(0, GameState.power - 5);
                         GameState.foxy.location = 'cam3';
                         GameState.flickerCams = ['door', 'cam3'];
@@ -677,7 +736,7 @@ function updateLogic() {
                         AudioManager.play('Jumpscare');
                         console.log("💀 JUMPSCARE！");
                         GameState.foxy.location = 'jumpscare';
-                        GameState.gameEnd = ture; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                        GameState.gameEnd = true; // 🌟 加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                         GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                         GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
                         GameState.targetGuardYaw = 0;   // 目標角度設為正前方
@@ -715,6 +774,23 @@ function updateLogic() {
         if (GameState.keys.Space) { GameState.obCam.y += speed; }
         if (GameState.keys.shift) { GameState.obCam.y -= speed; }
     }
+
+
+function applyDifficulty(aiLevels) {
+  // 公式：AI 如果是 0，時間設為 9999 秒 (永遠不動)。
+  // 否則，AI 越高，數字越小 (動越快)。
+  
+  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 15 - (ai * 0.65));
+  
+  GameState.bonnie.moveInterval = calcNormal(aiLevels.bonnie);
+  GameState.chica.moveInterval = calcNormal(aiLevels.chica);
+  GameState.freddy.moveInterval = calcNormal(aiLevels.freddy);
+
+  // Foxy 的計時器比較慢
+  const calcFoxy = (ai) => ai === 0 ? 9999 : Math.max(30, 200 - (ai * 8));
+  GameState.foxy.moveInterval = calcFoxy(aiLevels.foxy);
+
+  console.log("🔥 AI 難度已套用:", aiLevels);
 }
 
 function gameLoop() {
@@ -882,7 +958,7 @@ function winGame() {
     document.body.appendChild(overlay);
 
     document.getElementById('win-retry-btn').onclick = () => {
-        resetGame(); 
+        returnToMenu();
     };
 
     console.log("🎊 恭喜！你活到了 6 AM！");
@@ -974,7 +1050,7 @@ function loseGame(animatronicName) {
     // 🌟 按鈕點擊事件：直接重新整理網頁
     retryBtn.onclick = () => {
         //AudioManager.play('cam'); // 視情況播放一個點擊音效
-        resetGame();
+        returnToMenu();
     };
     overlay.appendChild(retryBtn);
 
@@ -1053,6 +1129,7 @@ window.onload = async () => {
           AudioManager.load('FreddyLaugh', 'sounds/Freddy_Laugh.mp3', 0.8);
           AudioManager.load('light', 'sounds/Light.mp3', 0.6); 
           AudioManager.load('light2', 'sounds/Light.mp3', 0.6); 
+          AudioManager.load('ED', 'sounds/Edoor.mp3', 0.8); 
           AudioManager.load('Foot', 'sounds/Footsteps.mp3', 0.4); 
           AudioManager.load('run', 'sounds/Foxy_Run.mp3', 0.8); 
           AudioManager.load('Foxy_Hit_Door', 'sounds/Foxy_Hit_Door.mp3', 0.8); 
@@ -1060,18 +1137,72 @@ window.onload = async () => {
           AudioManager.load('MusicBox', 'sounds/Music_Box_Theme.mp3', 0.8); 
           console.log("所有模型與音效載入完成！");
 
-          // 成功載入才顯示按鈕
+          // 🌟 1. 隱藏載入中文字
           document.getElementById('loading-text').style.display = 'none';
-          let btnStart = document.getElementById('btn-start');
-          btnStart.style.display = 'block';
 
-          btnStart.addEventListener('click', () => {
-              document.getElementById('start-screen').style.display = 'none';
-              document.getElementById('ui-layer').style.display = 'block';
-              GameState.gameStarted = true;
-              AudioManager.loop('Fan'); // 啟動風扇聲
-              gameLoop();
+          // 🌟 2. 隱藏舊版的 NEW GAME 按鈕 (因為我們現在有更精緻的選單了)
+          let btnStart = document.getElementById('btn-start');
+          if (btnStart) btnStart.style.display = 'none';
+
+          // 🌟 3. 直接顯示主選單 (Night 1 ~ 5)
+          let mainMenu = document.getElementById('main-menu');
+          if (mainMenu) mainMenu.style.display = 'flex';
+
+          // ==========================================
+          // 🌟 4. 綁定所有選單按鈕 (解除封印，直接綁定)
+          // ==========================================
+          
+          // 綁定 Night 1 ~ 5 按鈕
+          document.querySelectorAll('.menu-btn').forEach(btn => {
+              btn.addEventListener('click', (ev) => {
+                  let nightNum = parseInt(ev.target.getAttribute('data-night'));
+                  currentSelectedNight = nightNum;
+                  
+                  applyDifficulty(NIGHT_DATA[nightNum]); // 套用該夜晚的難度
+                  startGame(); // 啟動遊戲！
+              });
           });
+
+          // 綁定 Custom Night 面板切換
+          let btnOpenCustom = document.getElementById('btn-open-custom');
+          if (btnOpenCustom) {
+              btnOpenCustom.onclick = () => {
+                  document.getElementById('main-menu').style.display = 'none';
+                  document.getElementById('custom-night-panel').style.display = 'block';
+              };
+          }
+          
+          let btnBackMenu = document.getElementById('btn-back-menu');
+          if (btnBackMenu) {
+              btnBackMenu.onclick = () => {
+                  document.getElementById('custom-night-panel').style.display = 'none';
+                  document.getElementById('main-menu').style.display = 'flex';
+              };
+          }
+
+          // 綁定 Custom Night 等級加減 (+ / -)
+          document.querySelectorAll('.ai-adj').forEach(btn => {
+              btn.onclick = (ev) => {
+                  let animatronic = ev.target.getAttribute('data-animatronic');
+                  let dir = parseInt(ev.target.getAttribute('data-dir'));
+                  
+                  customAI[animatronic] += dir;
+                  if (customAI[animatronic] > 20) customAI[animatronic] = 20;
+                  if (customAI[animatronic] < 0) customAI[animatronic] = 0;
+                  
+                  document.getElementById(`ai-val-${animatronic}`).innerText = customAI[animatronic];
+              };
+          });
+
+          // 綁定 Custom Night 開始按鈕
+          let btnStartCustom = document.getElementById('btn-start-custom');
+          if (btnStartCustom) {
+              btnStartCustom.onclick = () => {
+                  currentSelectedNight = 'custom';
+                  applyDifficulty(customAI); // 套用玩家剛才調整的 20/20/20/20 難度
+                  startGame(); // 啟動遊戲！
+              };
+          }
 
       } catch (error) {
           // 💀 如果載入失敗，會跑到這裡！
@@ -1084,6 +1215,21 @@ window.onload = async () => {
       }
   }
 };
+
+function startGame() {
+  document.getElementById('start-screen').style.display = 'none';
+  document.getElementById('ui-layer').style.display = 'block';
+  
+  // 如果你有寫 resetGame，記得在這裡呼叫它來確保狀態乾淨！
+  if (typeof resetGame === 'function') {
+      resetGame();
+  } else {
+      GameState.gameStarted = true;
+  }
+  
+  AudioManager.loop('Fan'); // 啟動風扇聲
+  gameLoop();  // 開始迴圈
+}
 
 function parseOBJ(text) {
   // because indices are base 1 let's just fill in the 0th data
