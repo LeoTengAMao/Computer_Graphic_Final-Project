@@ -559,7 +559,26 @@ function updateLogic() {
         else powerUI.style.color = '#0f0';
     }
 
-    // 停電了！
+    if (GameState.obMode) {
+      let speed = 0.2;
+      let yawRad = GameState.obCam.yaw * Math.PI / 180;
+
+      // 計算相對於攝影機視角的「前方」與「右方」向量
+      let forwardX = Math.sin(yawRad);
+      let forwardZ = -Math.cos(yawRad);
+      let rightX = Math.cos(yawRad);
+      let rightZ = Math.sin(yawRad);
+
+      // 偵測 WASD 與上下鍵，改變攝影機座標
+      if (GameState.keys.w) { GameState.obCam.x += forwardX * speed; GameState.obCam.z += forwardZ * speed; }
+      if (GameState.keys.s) { GameState.obCam.x -= forwardX * speed; GameState.obCam.z -= forwardZ * speed; }
+      if (GameState.keys.a) { GameState.obCam.x -= rightX * speed; GameState.obCam.z -= rightZ * speed; }
+      if (GameState.keys.d) { GameState.obCam.x += rightX * speed; GameState.obCam.z += rightZ * speed; }
+      
+      // Space 鍵上升，Shift 鍵下降
+      if (GameState.keys.Space) { GameState.obCam.y += speed; }
+      if (GameState.keys.shift) { GameState.obCam.y -= speed; }
+  }
 
 
     //怪物 AI 邏輯 (Bonnie)
