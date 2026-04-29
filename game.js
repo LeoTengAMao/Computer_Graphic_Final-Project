@@ -617,6 +617,7 @@ function updateLogic() {
                         console.log("JUMPSCARE！");
                         GameState.bonnie.location = 'jumpscare';
                         GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
+                        AudioManager.stopPhone();
                        GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                        GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
                         GameState.targetGuardYaw = 0;   // 目標角度設為正前方
@@ -666,6 +667,7 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log(" JUMPSCARE！");
                       GameState.chica.location = 'jumpscare';
+                      AudioManager.stopPhone();
                       GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                       GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                       GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
@@ -717,6 +719,7 @@ function updateLogic() {
                       AudioManager.play('Jumpscare');
                       console.log("JUMPSCARE！");
                       GameState.freddy.location = 'jumpscare';
+                      AudioManager.stopPhone();
                       GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                       GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                       GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
@@ -783,6 +786,7 @@ function updateLogic() {
                         AudioManager.play('Jumpscare');
                         console.log(" JUMPSCARE！");
                         GameState.foxy.location = 'jumpscare';
+                        AudioManager.stopPhone();
                         GameState.gameEnd = true; //  加上這行，確保系統進入停電癱瘓狀態，其他怪物就會停止行動
                         GameState.isMonitorOpen = false; // 強制把監視器收起來，強迫玩家直視怪物！
                         GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
@@ -899,6 +903,7 @@ function gameLoop() {
         if (GameState.powerOutTimer > 30) {
             GameState.powerOutPhase = 3; // 進入第三階段：死亡
             GameState.freddy.location = 'jumpscare';
+            AudioManager.stopPhone();
             GameState.isJumpscaring = true; // 啟動跳殺狀態，鎖死滑鼠
             GameState.targetGuardYaw = 0;   // 目標角度設為正前方
             GameState.guardYaw = 0;
