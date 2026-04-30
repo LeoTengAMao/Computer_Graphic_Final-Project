@@ -93,7 +93,7 @@ function returnToMenu() {
   let winOverlay = document.getElementById('win-overlay');
   if (winOverlay) winOverlay.remove();
 
-
+  GameState.gameStarted = false; // 
   // 3. 把變數全部重置洗乾淨 (呼叫你寫好的 resetGame)
   if(typeof resetGame === 'function') resetGame();
   GameState.gameStarted = false; // 確保遊戲迴圈停止運作
@@ -582,7 +582,7 @@ function updateLogic() {
 
 
     //怪物 AI 邏輯 (Bonnie)
-    if (GameState.power > 0 && GameState.gameEnd === false) { 
+    if (GameState.power > 0 && GameState.gameEnd === false && GameState.gameStarted == true) { 
         GameState.bonnie.timer += 0.01; 
 
         if (GameState.bonnie.timer >= GameState.bonnie.moveInterval) {
@@ -633,7 +633,7 @@ function updateLogic() {
 
 
      // 怪物 AI 邏輯 (Chica)
-    if (GameState.power > 0 && GameState.gameEnd === false) { 
+    if (GameState.power > 0 && GameState.gameEnd === false && GameState.gameStarted == true) { 
       GameState.chica.timer += 0.01; 
 
       if (GameState.chica.timer >= GameState.chica.moveInterval) {
@@ -685,7 +685,7 @@ function updateLogic() {
 
 
 
-    if (GameState.power > 0 && GameState.gameEnd === false) { 
+    if (GameState.power > 0 && GameState.gameEnd === false &&GameState.gameStarted == true) { 
       GameState.freddy.timer += 0.01; 
 
       if (GameState.freddy.timer >= GameState.freddy.moveInterval) {
@@ -747,7 +747,7 @@ function updateLogic() {
       if (!isWatchingFoxy || GameState.foxy.phase === 3) {
           GameState.foxy.timer += 0.1; // (請配合你原本增加時間的數值，可能是 += 1 或 += deltaTime)
       }
-      if (GameState.power > 0 && GameState.gameEnd === false) { 
+      if (GameState.power > 0 && GameState.gameEnd === false && GameState.gameStarted == true) { 
         if (GameState.foxy.timer >= GameState.foxy.moveInterval) {
             GameState.foxy.timer = 0; // 重置計時
             if (GameState.foxy.phase < 4) {
@@ -831,12 +831,12 @@ function applyDifficulty(aiLevels) {
   // 公式：AI 如果是 0，時間設為 9999 秒 (永遠不動)。
   // 否則，AI 越高，數字越小 (動越快)。
   
-  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 20 - (ai * 0.65));
+  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 20 - (ai * 0.7));
   
   GameState.bonnie.moveInterval = calcNormal(aiLevels.bonnie);
   GameState.chica.moveInterval = calcNormal(aiLevels.chica);
 
-  const calcFred = (ai) => ai === 0 ? 9999 : Math.max(1.5, 40 - (ai * 0.65));
+  const calcFred = (ai) => ai === 0 ? 9999 : Math.max(1.5, 30 - (ai * 0.65));
 
   GameState.freddy.moveInterval = calcFred(aiLevels.freddy);
 
