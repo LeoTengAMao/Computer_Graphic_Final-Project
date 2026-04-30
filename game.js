@@ -831,12 +831,12 @@ function applyDifficulty(aiLevels) {
   // 公式：AI 如果是 0，時間設為 9999 秒 (永遠不動)。
   // 否則，AI 越高，數字越小 (動越快)。
   
-  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 30 - (ai * 0.65));
+  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 20 - (ai * 0.65));
   
   GameState.bonnie.moveInterval = calcNormal(aiLevels.bonnie);
   GameState.chica.moveInterval = calcNormal(aiLevels.chica);
 
-  const calcFred = (ai) => ai === 0 ? 9999 : Math.max(1.5, 50 - (ai * 0.65));
+  const calcFred = (ai) => ai === 0 ? 9999 : Math.max(1.5, 40 - (ai * 0.65));
 
   GameState.freddy.moveInterval = calcFred(aiLevels.freddy);
 
