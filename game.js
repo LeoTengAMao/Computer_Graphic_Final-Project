@@ -2,7 +2,7 @@
 const NIGHT_DATA = {
   1: { bonnie: 3, chica: 3, freddy: 0, foxy: 0 }, // 第一夜最簡單 (AI 皆為 0 不會動)
   2: { bonnie: 5, chica: 2, freddy: 0, foxy: 0 },
-  3: { bonnie: 7, chica: 5, freddy: 1, foxy: 3 },
+  3: { bonnie: 7, chica: 5, freddy: 0, foxy: 3 },
   4: { bonnie: 8, chica: 7, freddy: 2, foxy: 5 },
   5: { bonnie: 10, chica: 12, freddy: 5, foxy: 7 }
 };
