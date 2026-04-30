@@ -1,9 +1,9 @@
 
 const NIGHT_DATA = {
-  1: { bonnie: 1, chica: 1, freddy: 0, foxy: 0 }, // 第一夜最簡單 (AI 皆為 0 不會動)
-  2: { bonnie: 3, chica: 1, freddy: 0, foxy: 0 },
-  3: { bonnie: 4, chica: 5, freddy: 1, foxy: 2 },
-  4: { bonnie: 6, chica: 7, freddy: 2, foxy: 5 },
+  1: { bonnie: 3, chica: 3, freddy: 0, foxy: 0 }, // 第一夜最簡單 (AI 皆為 0 不會動)
+  2: { bonnie: 5, chica: 2, freddy: 0, foxy: 0 },
+  3: { bonnie: 7, chica: 5, freddy: 1, foxy: 3 },
+  4: { bonnie: 8, chica: 7, freddy: 2, foxy: 5 },
   5: { bonnie: 10, chica: 12, freddy: 5, foxy: 7 }
 };
 
@@ -831,14 +831,17 @@ function applyDifficulty(aiLevels) {
   // 公式：AI 如果是 0，時間設為 9999 秒 (永遠不動)。
   // 否則，AI 越高，數字越小 (動越快)。
   
-  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 15 - (ai * 0.65));
+  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 30 - (ai * 0.65));
   
   GameState.bonnie.moveInterval = calcNormal(aiLevels.bonnie);
   GameState.chica.moveInterval = calcNormal(aiLevels.chica);
-  GameState.freddy.moveInterval = calcNormal(aiLevels.freddy);
+
+  const calcFred = (ai) => ai === 0 ? 9999 : Math.max(1.5, 50 - (ai * 0.65));
+
+  GameState.freddy.moveInterval = calcFred(aiLevels.freddy);
 
   // Foxy 的計時器比較慢
-  const calcFoxy = (ai) => ai === 0 ? 9999 : Math.max(30, 200 - (ai * 8));
+  const calcFoxy = (ai) => ai === 0 ? 9999 : Math.max(30, 300 - (ai * 10));
   GameState.foxy.moveInterval = calcFoxy(aiLevels.foxy);
   GameState.foxy.movesave = calcFoxy(aiLevels.foxy);
   console.log("AI 難度已套用:", aiLevels);
