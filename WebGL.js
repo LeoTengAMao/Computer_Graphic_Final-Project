@@ -30,10 +30,14 @@ const Renderer = {
     varying vec3 v_Position; 
     uniform bool u_UseTexture; 
 
-    // --- 新增：Phong 高光需要的變數 ---
+    // --- Phong 高光需要的變數 ---
     uniform vec3 u_EyePos;          // 攝影機（眼睛）在真實世界的位置
-    uniform float u_Shininess;      // 高光反光的粗糙度 (數值越大越集中，如 32.0)
-    uniform vec3 u_MaterialSpecular;// 材質高光顏色 (通常可以用 vec3(1.0) 代表白光)
+    uniform float u_Shininess;      // 高光反光的粗糙度
+    uniform vec3 u_MaterialSpecular;// 材質高光顏色
+
+    // --- 新增：環境貼圖反射需要的變數 ---
+    uniform samplerCube u_SkyboxSampler; // 用來讀取 Skybox 貼圖
+    uniform float u_EnvReflectWeight;   // 反射強度開關 (0.0 代表一般物體，0.0~1.0 代表鏡面反射強度)
 
     #define NUM_LIGHTS 11 // 宣告這個世界最多有 11 盞燈！
 
@@ -53,7 +57,7 @@ const Renderer = {
         vec3 viewDir = normalize(u_EyePos - v_Position);
 
         vec3 totalDiffuse = vec3(0.0); // 收集漫反射
-        vec3 totalSpecular = vec3(0.0); // 【核心新增】用來收集所有燈泡的高光！
+        vec3 totalSpecular = vec3(0.0); // 用來收集所有燈泡的高光！
 
         // 迴圈：計算 11 盞燈的衰減、漫反射與高光
         for(int i = 0; i < NUM_LIGHTS; i++) {
@@ -67,16 +71,11 @@ const Renderer = {
             
             totalDiffuse += u_LightColor[i] * color.rgb * nDotL * attenuation;
 
-            // 2. 【核心新增】高光計算 (Phong Shading)
-            if (nDotL > 0.0) { // 只有照得到光的一面才算高光
-                // 計算光線的反射向量 R (注意：reflect 的第一個參數是「從光源指向物體」)
+            // 2. 高光計算 (Phong Shading)
+            if (nDotL > 0.0) {
                 vec3 reflectDir = reflect(-lightDir, normal);
                 float rDotV = max(dot(reflectDir, viewDir), 0.0);
-                
-                // 使用 pow 計算高光權重
                 float specularWeight = pow(rDotV, u_Shininess);
-                
-                // 累加高光：光源顏色 * 材質高光色 * 權重 * 衰減
                 totalSpecular += u_LightColor[i] * u_MaterialSpecular * specularWeight * attenuation;
             }
         }
@@ -84,10 +83,43 @@ const Renderer = {
         // 環境光 (底色)
         vec3 ambient = color.rgb * 0.02; 
         
-        // 最終顏色 = 環境光 + 所有燈光的漫反射總和 + 所有燈光的高光總和
-        gl_FragColor = vec4(ambient + totalDiffuse + totalSpecular, color.a);
+        // 基礎光照總和
+        vec3 lightingColor = ambient + totalDiffuse + totalSpecular;
+
+        // 【核心新增】計算環境貼圖鏡面反射
+        // 使用 reflect() 函數，根據「眼睛看像物體的方向」與「法向量」算出射向天空盒的反射方向
+        vec3 incidentDir = normalize(v_Position - u_EyePos); // 視線入射方向
+        vec3 envReflectDir = reflect(incidentDir, normal);
+        vec4 reflectColor = textureCube(u_SkyboxSampler, envReflectDir);
+
+        // 根據權重混合原本的光照底色與反射出來的天空盒顏色
+        vec3 finalColor = mix(lightingColor, reflectColor.rgb, u_EnvReflectWeight);
+        
+        gl_FragColor = vec4(finalColor, color.a);
     }
     `,
+
+    // WebGL.js 頂部新增
+    SKYBOX_VSHADER: `
+    attribute vec4 a_Position;
+    varying vec3 v_TexCoord; // 天空盒的紋理座標是 3D 向量 (指向方塊的外側)
+    uniform mat4 u_MvpMatrix;
+    void main() {
+        gl_Position = u_MvpMatrix * a_Position;
+        v_TexCoord = normalize(a_Position.xyz); // 直接用頂點的相對位置當作採樣方向！
+    }
+    `,
+
+    SKYBOX_FSHADER: `
+    precision mediump float;
+    varying vec3 v_TexCoord;
+    uniform samplerCube u_Skybox; // 注意：這裡是 samplerCube，不是 sampler2D
+    void main() {
+        gl_FragColor = textureCube(u_Skybox, v_TexCoord);
+    }
+    `,
+
+    skyboxProgram: null, // 用來存編譯好的 Skybox 著色器程式
 
     init: function(canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -100,6 +132,7 @@ const Renderer = {
         this.initCube();
         this.initCylinder();
         this.resizeCanvas();
+        this.skyboxProgram = this.compileShader(this.SKYBOX_VSHADER, this.SKYBOX_FSHADER);
         window.addEventListener('resize', () => this.resizeCanvas());
         return true;
     },
@@ -176,7 +209,42 @@ const Renderer = {
             indexCount: indices.length // 紀錄要畫幾個點
         };
     },
+drawSkybox: function(proj, view, camX, camY, camZ) {
+        if (!this.skyboxTexture) return; 
 
+        let gl = this.gl;
+        gl.useProgram(this.skyboxProgram);
+
+        gl.depthMask(false); 
+
+        let modelMatrix = new Matrix4();
+        //  修正：讓天空盒中心永遠固定在攝影機的 (camX, camY, camZ)
+        modelMatrix.translate(camX, camY, camZ);
+        // 將放大倍率稍微拉大到 150 倍，配合我們剛才放寬到 300 的遠裁剪面
+        modelMatrix.scale(100.0, 100.0, 100.0); 
+
+        let mvpMatrix = new Matrix4();
+        mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
+
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.skyboxProgram, 'u_MvpMatrix'), false, mvpMatrix.elements);
+
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.skyboxTexture);
+        gl.uniform1i(gl.getUniformLocation(this.skyboxProgram, 'u_Skybox'), 1);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.cubeBufferInfo.vertexBuffer);
+        let a_Position = gl.getAttribLocation(this.skyboxProgram, 'a_Position');
+        gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Position);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.cubeBufferInfo.indexBuffer);
+        
+        gl.disable(gl.CULL_FACE); 
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_BYTE, 0);
+
+        gl.depthMask(true); 
+    },
+    
     // 技能 2：專門畫圓柱體的函數 (跟 drawBlock 幾乎一樣，只是換了 Buffer)
     drawCylinder: function(proj, view, tx, ty, tz, sx, sy, sz, r, g, b) {
         let modelMatrix = new Matrix4();
@@ -187,7 +255,7 @@ const Renderer = {
         mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
         let normalMatrix = new Matrix4();
         normalMatrix.setInverseOf(modelMatrix).transpose();
-
+        this.gl.uniform1f(this.gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 0.0);
         // 在 drawCylinder 裡面加上這行
         this.gl.uniform1i(this.gl.getUniformLocation(this.program, 'u_UseTexture'), 0);
 
@@ -230,14 +298,57 @@ const Renderer = {
         return texture;
     },
 
+    
+
     textures: {},
+
+    // WebGL.js 內部，放在 loadTexture 下方
+    loadCubeMap: function(urls) {
+        // urls 必須是一個包含 6 個圖片路徑的物件：
+        // { targetXPositive, targetXNegative, targetYPositive, targetYNegative, targetZPositive, targetZNegative }
+        let gl = this.gl;
+        let texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+
+        const targets = [
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, url: urls.right },  // 右 (+X)
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, url: urls.left },   // 左 (-X)
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, url: urls.top },    // 上 (+Y)
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, url: urls.bottom }, // 下 (-Y)
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, url: urls.back },   // 後 (+Z)
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, url: urls.front }   // 前 (-Z)
+        ];
+
+        targets.forEach((item) => {
+            const { target, url } = item;
+            // 先用 1x1 的暫時紋理填充，避免圖片還沒載入完時報錯
+            gl.texImage2D(target, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+
+            let image = new Image();
+            image.onload = () => {
+                gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+                gl.texImage2D(target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+            };
+            image.src = url;
+        });
+
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        this.skyboxTexture = texture; // 存起來備用
+        return texture;
+    },
+    skyboxTexture: null,
 
     // 專門為了電風扇發明的新技能：畫出會自轉的方塊！
     drawRotatedBlock: function(proj, view, tx, ty, tz, sx, sy, sz, angle, r, g, b) {
         let modelMatrix = new Matrix4();
-        modelMatrix.translate(tx, ty, tz);      // 3. 移動到桌上
-        modelMatrix.rotate(angle, 0, 0, 1);     // 2. 繞著自己的 Z 軸旋轉
-        modelMatrix.scale(sx, sy, sz);          // 1. 先縮放成葉片的形狀
+        modelMatrix.translate(tx, ty, tz);      
+        modelMatrix.rotate(angle, 0, 0, 1);     
+        modelMatrix.scale(sx, sy, sz);          
 
         let mvpMatrix = new Matrix4();
         mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
@@ -248,16 +359,21 @@ const Renderer = {
         let gl = this.gl;
         gl.useProgram(this.program);
 
-        // 關閉貼圖，設定顏色
         gl.uniform1i(gl.getUniformLocation(this.program, 'u_UseTexture'), 0);
         gl.uniform3f(gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b);
 
-        // 傳入矩陣
+        // 🔥【核心新增】開啟環境貼圖反射！並傳入 0.6 的強度（變成電鍍金屬鏡面外觀）
+        gl.uniform1f(gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 0.6);
+        
+        // 將已經加載的天空盒紋理（TEXTURE1）傳遞給主著色器中的環境採樣器
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.skyboxTexture);
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_SkyboxSampler'), 1);
+
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
 
-        // 繪製方塊
         gl.bindBuffer(gl.ARRAY_BUFFER, this.cubeBufferInfo.vertexBuffer);
         let a_Position = gl.getAttribLocation(this.program, 'a_Position');
         gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
@@ -290,7 +406,7 @@ const Renderer = {
 
         let gl = this.gl;
         gl.useProgram(this.program);
-
+        gl.uniform1f(gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 0.0);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
@@ -336,7 +452,7 @@ const Renderer = {
         // 圖學燈光系統：全區 10 盞燈陣列
   
         
-        let officeR = 0.8, officeG = 0.7, officeB = 0.5; // 正常微黃光
+        let officeR = 1.6, officeG = 1.4, officeB = 1.0; // 正常微黃光
 
         if (gameState.isPowerOut) {
             if (gameState.powerOutPhase === 1) {
@@ -465,7 +581,8 @@ const Renderer = {
 
         let projMatrix = new Matrix4();
         let viewMatrix = new Matrix4();
-        projMatrix.setPerspective(60, this.canvas.width / this.canvas.height, 0.1, 100);
+       // 請在 draw 函數裡找到這行並修改最後一個參數
+        projMatrix.setPerspective(60, this.canvas.width / this.canvas.height, 0.1, 300);    
 
         // 切換 OB 模式與一般模式
         if (gameState.obMode) {
@@ -530,6 +647,14 @@ const Renderer = {
                 0, 1, 0                  // 頭頂朝上
             );
         }
+
+
+        // --- 【核心新增】繪製天空盒背景 ---
+        // 這裡的 camX, camY, camZ 就是我們剛剛在第一步為了高光撈出來的攝影機位置！
+        this.drawSkybox(projMatrix, viewMatrix, camX, camY, camZ);
+
+        // 記得切換回原本的主程式 Shader，因為下面的物體要用原本的 Shader 畫
+        this.gl.useProgram(this.program);
 
         // --- 開始捏地圖 (Blockout) ---
 
@@ -911,7 +1036,7 @@ const Renderer = {
         let modelMatrix = new Matrix4();
         modelMatrix.translate(tx, ty, tz);
         modelMatrix.scale(sx, sy, sz);
-
+        
         let mvpMatrix = new Matrix4();
         mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
         
@@ -920,7 +1045,7 @@ const Renderer = {
 
         let gl = this.gl;
         gl.useProgram(this.program);
-
+        gl.uniform1f(gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 0.0);
         // 核心修正：強制關閉貼圖開關
         let u_UseTexture = gl.getUniformLocation(this.program, 'u_UseTexture');
         gl.uniform1i(u_UseTexture, 0); // 0 代表 False，不使用貼圖
