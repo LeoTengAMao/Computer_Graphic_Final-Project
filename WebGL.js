@@ -20,6 +20,7 @@ const Renderer = {
     }
     `,
 
+    // 請將 FSHADER_SOURCE 替換為以下內容
     FSHADER_SOURCE: `
     precision mediump float;
     varying vec3 v_Normal;
@@ -28,6 +29,11 @@ const Renderer = {
     uniform vec3 u_BaseColor; 
     varying vec3 v_Position; 
     uniform bool u_UseTexture; 
+
+    // --- 新增：Phong 高光需要的變數 ---
+    uniform vec3 u_EyePos;          // 攝影機（眼睛）在真實世界的位置
+    uniform float u_Shininess;      // 高光反光的粗糙度 (數值越大越集中，如 32.0)
+    uniform vec3 u_MaterialSpecular;// 材質高光顏色 (通常可以用 vec3(1.0) 代表白光)
 
     #define NUM_LIGHTS 11 // 宣告這個世界最多有 11 盞燈！
 
@@ -42,25 +48,44 @@ const Renderer = {
             color = vec4(u_BaseColor, 1.0);
         }
         
-        vec3 totalDiffuse = vec3(0.0); // 準備一個變數，用來收集所有燈泡的光
+        vec3 normal = normalize(v_Normal);
+        // 計算從物體表面指向攝影機的視角向量 V
+        vec3 viewDir = normalize(u_EyePos - v_Position);
 
-        // 迴圈：計算 10 盞燈的衰減與亮度，全部加在一起
+        vec3 totalDiffuse = vec3(0.0); // 收集漫反射
+        vec3 totalSpecular = vec3(0.0); // 【核心新增】用來收集所有燈泡的高光！
+
+        // 迴圈：計算 11 盞燈的衰減、漫反射與高光
         for(int i = 0; i < NUM_LIGHTS; i++) {
             vec3 lightDir = u_LightPos[i] - v_Position;
             float distance = length(lightDir);
             lightDir = normalize(lightDir);
 
-            float nDotL = max(dot(v_Normal, lightDir), 0.0);
+            // 1. 漫反射計算 (nDotL)
+            float nDotL = max(dot(normal, lightDir), 0.0);
             float attenuation = 1.0 / (1.0 + 0.15 * distance + 0.05 * (distance * distance));
             
             totalDiffuse += u_LightColor[i] * color.rgb * nDotL * attenuation;
+
+            // 2. 【核心新增】高光計算 (Phong Shading)
+            if (nDotL > 0.0) { // 只有照得到光的一面才算高光
+                // 計算光線的反射向量 R (注意：reflect 的第一個參數是「從光源指向物體」)
+                vec3 reflectDir = reflect(-lightDir, normal);
+                float rDotV = max(dot(reflectDir, viewDir), 0.0);
+                
+                // 使用 pow 計算高光權重
+                float specularWeight = pow(rDotV, u_Shininess);
+                
+                // 累加高光：光源顏色 * 材質高光色 * 權重 * 衰減
+                totalSpecular += u_LightColor[i] * u_MaterialSpecular * specularWeight * attenuation;
+            }
         }
 
         // 環境光 (底色)
         vec3 ambient = color.rgb * 0.02; 
         
-        // 最終顏色 = 底色 + 所有燈光的總和
-        gl_FragColor = vec4(ambient + totalDiffuse, color.a);
+        // 最終顏色 = 環境光 + 所有燈光的漫反射總和 + 所有燈光的高光總和
+        gl_FragColor = vec4(ambient + totalDiffuse + totalSpecular, color.a);
     }
     `,
 
@@ -380,6 +405,40 @@ const Renderer = {
         
         this.gl.uniform3fv(u_LightPos, lightPositions);
         this.gl.uniform3fv(u_LightColor, lightColors);
+
+        // --- 【核心新增】動態抓取當前模式下的攝影機世界座標 ---
+        let camX = 0, camY = 1.5, camZ = 12; // 預設值（警衛室位置）
+
+        if (gameState.obMode) {
+            // 1. OB 自由飛行模式
+            camX = gameState.obCam.x;
+            camY = gameState.obCam.y;
+            camZ = gameState.obCam.z;
+        } else if (gameState.isMonitorOpen && gameState.power > 0) {    
+            // 2. 監視器模式 (直接借用你下面 switch 裡面 setLookAt 的前三個參數)
+            switch (gameState.currentCam) {
+                case 'cam1': camX = 8;  camY = 6;   camZ = -18; break;
+                case 'cam2': camX = 0;  camY = 6;   camZ = -6;  break;
+                case 'cam3': camX = -6; camY = 6;   camZ = -15; break;
+                case 'cam4': camX = 8;  camY = 4;   camZ = -4;  break;
+                case 'cam5': camX = 10; camY = 8;   camZ = -20; break;
+                case 'cam6': camX = -5; camY = 3;   camZ = 12;  break;
+                case 'cam7': camX = -8; camY = 4.5; camZ = 8;   break;
+                case 'cam8': camX = 27.5;camY = 2;  camZ = 14;  break;
+            }
+        } else {
+            // 3. 警衛模式
+            camX = 0; camY = 1.5; camZ = 12;
+        }
+
+        // 把攝影機座標、高光粗糙度、高光材質顏色傳給 Uniform
+        let u_EyePos = this.gl.getUniformLocation(this.program, 'u_EyePos');
+        let u_Shininess = this.gl.getUniformLocation(this.program, 'u_Shininess');
+        let u_MaterialSpecular = this.gl.getUniformLocation(this.program, 'u_MaterialSpecular');
+
+        this.gl.uniform3f(u_EyePos, camX, camY, camZ);
+        this.gl.uniform1f(u_Shininess, 32.0); // 數值 32.0 效果不錯，你可以調 64（更硬）或 16（更軟）
+        this.gl.uniform3f(u_MaterialSpecular, 1.0, 1.0, 1.0); // 純白高光點
 
 
 
