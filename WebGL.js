@@ -304,19 +304,26 @@ drawSkybox: function(proj, view, camX, camY, camZ) {
 
     // WebGL.js 內部，放在 loadTexture 下方
     loadCubeMap: function(urls) {
-        // urls 必須是一個包含 6 個圖片路徑的物件：
-        // { targetXPositive, targetXNegative, targetYPositive, targetYNegative, targetZPositive, targetZNegative }
+        // urls 必須是一個包含 6 個圖片路徑的物件，支援以下任一格式：
+        // { px, nx, py, ny, pz, nz }
+        // 或舊格式：{ right, left, top, bottom, back, front }
+        // 如果傳入沒有副檔名，會自動補上 .png
         let gl = this.gl;
         let texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
 
+        const normalizeUrl = (url) => {
+            if (!url) return url;
+            return /\.[^./?#]+$/.test(url) ? url : `${url}.png`;
+        };
+
         const targets = [
-            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, url: urls.right },  // 右 (+X)
-            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, url: urls.left },   // 左 (-X)
-            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, url: urls.top },    // 上 (+Y)
-            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, url: urls.bottom }, // 下 (-Y)
-            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, url: urls.back },   // 後 (+Z)
-            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, url: urls.front }   // 前 (-Z)
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, url: normalizeUrl(urls.px || urls.right) },  // 右 (+X)
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, url: normalizeUrl(urls.nx || urls.left) },   // 左 (-X)
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, url: normalizeUrl(urls.py || urls.top) },    // 上 (+Y)
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, url: normalizeUrl(urls.ny || urls.bottom) }, // 下 (-Y)
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, url: normalizeUrl(urls.pz || urls.back) },   // 後 (+Z)
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, url: normalizeUrl(urls.nz || urls.front) }   // 前 (-Z)
         ];
 
         targets.forEach((item) => {
