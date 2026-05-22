@@ -302,50 +302,71 @@ drawSkybox: function(proj, view, camX, camY, camZ) {
 
     textures: {},
 
-    // WebGL.js 內部，放在 loadTexture 下方
-    loadCubeMap: function(urls) {
-        // urls 必須是一個包含 6 個圖片路徑的物件，支援以下任一格式：
-        // { px, nx, py, ny, pz, nz }
-        // 或舊格式：{ right, left, top, bottom, back, front }
-        // 如果傳入沒有副檔名，會自動補上 .png
+    
+
+    // WebGL.js 內部，放在 loadTexture 下方// WebGL.js 內部，放在 loadTexture 下方// WebGL.js 內部，放在 loadTexture 下方
+    loadCubeMap: function(urlsOrPath) {
         let gl = this.gl;
         let texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
 
-        const normalizeUrl = (url) => {
-            if (!url) return url;
-            return /\.[^./?#]+$/.test(url) ? url : `${url}.png`;
-        };
+        // 🌟 自動相容轉換：如果傳進來的是字串 'assets'，自動拼裝 6 個面的路徑
+        let urls = {};
+        if (typeof urlsOrPath === 'string') {
+            let basePath = urlsOrPath.endsWith('/') ? urlsOrPath : urlsOrPath + '/';
+            urls = {
+                px: basePath + 'px.jpg',
+                nx: basePath + 'nx.jpg',
+                py: basePath + 'py.jpg',
+                ny: basePath + 'ny.jpg',
+                pz: basePath + 'pz.jpg',
+                nz: basePath + 'nz.jpg'
+            };
+        } else {
+            urls = urlsOrPath;
+        }
 
         const targets = [
-            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, url: normalizeUrl(urls.px || urls.right) },  // 右 (+X)
-            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, url: normalizeUrl(urls.nx || urls.left) },   // 左 (-X)
-            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, url: normalizeUrl(urls.py || urls.top) },    // 上 (+Y)
-            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, url: normalizeUrl(urls.ny || urls.bottom) }, // 下 (-Y)
-            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, url: normalizeUrl(urls.pz || urls.back) },   // 後 (+Z)
-            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, url: normalizeUrl(urls.nz || urls.front) }   // 前 (-Z)
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, url: urls.px }, 
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, url: urls.nx }, 
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, url: urls.py }, 
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, url: urls.ny }, 
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, url: urls.pz }, 
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, url: urls.nz }  
         ];
 
-        targets.forEach((item) => {
-            const { target, url } = item;
-            // 先用 1x1 的暫時紋理填充，避免圖片還沒載入完時報錯
-            gl.texImage2D(target, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
-
-            let image = new Image();
-            image.onload = () => {
-                gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
-                gl.texImage2D(target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-                gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
-            };
-            image.src = url;
-        });
+        // 先用 1x1 的黑色填滿 6 個面，避免初期報錯
+        for (let i = 0; i < 6; i++) {
+            gl.texImage2D(targets[i].target, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+        }
 
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        this.skyboxTexture = texture; // 存起來備用
+        let loadedCount = 0; // 🌟 新增：載入計數器
+
+        targets.forEach((item) => {
+            let image = new Image();
+            image.onload = () => {
+                gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
+                gl.texImage2D(item.target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                loadedCount++; // 每載入一張就 +1
+                
+                // 🌟 核心修正：必須等 6 張都載入完畢，才能呼叫 Mipmap 組裝！
+                if (loadedCount === 6) {
+                    gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
+                    console.log("🌌 Skybox 6張圖片全部載入並組合完成！");
+                }
+            };
+            image.onerror = () => {
+                console.error("❌ Skybox 圖片找不到或載入失敗: " + item.url);
+            };
+            image.src = item.url;
+        });
+
+        this.skyboxTexture = texture; 
         return texture;
     },
     skyboxTexture: null,

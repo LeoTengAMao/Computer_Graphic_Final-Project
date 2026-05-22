@@ -1143,6 +1143,8 @@ window.onload = async () => {
       console.log("正在載入所有機械玩偶模型...");
       Renderer.models = {}; 
 
+      Renderer.loadCubeMap('assets');
+
       try {
           //Freddy
           Renderer.models.freddyNormal = await loadAndParseModel('models/Freddy.obj', FREDDY_MATERIALS);
