@@ -131,6 +131,7 @@ const Renderer = {
         this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
         this.initCube();
         this.initCylinder();
+        this.initSphere();
         this.resizeCanvas();
         this.skyboxProgram = this.compileShader(this.SKYBOX_VSHADER, this.SKYBOX_FSHADER);
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -209,7 +210,110 @@ const Renderer = {
             indexCount: indices.length // 紀錄要畫幾個點
         };
     },
-drawSkybox: function(proj, view, camX, camY, camZ) {
+
+    initSphere: function() {
+        let segments = 32; // 分段數，越多越圓滑
+        let positions = [];
+        let normals = [];
+        let indices = [];
+
+        for (let y = 0; y <= segments; y++) {
+            let theta = y * Math.PI / segments;
+            let sinTheta = Math.sin(theta);
+            let cosTheta = Math.cos(theta);
+
+            for (let x = 0; x <= segments; x++) {
+                let phi = x * 2 * Math.PI / segments;
+                let sinPhi = Math.sin(phi);
+                let cosPhi = Math.cos(phi);
+
+                let xPos = cosPhi * sinTheta;
+                let yPos = cosTheta;
+                let zPos = sinPhi * sinTheta;
+
+                positions.push(xPos, yPos, zPos);
+                normals.push(xPos, yPos, zPos); // 球體的法線等於歸一化的位置
+            }
+        }
+
+        // 連接三角形頂點
+        for (let y = 0; y < segments; y++) {
+            for (let x = 0; x < segments; x++) {
+                let p1 = (y * (segments + 1)) + x;
+                let p2 = p1 + (segments + 1);
+                indices.push(p1, p2, p1 + 1);
+                indices.push(p1 + 1, p2, p2 + 1);
+            }
+        }
+
+        // 轉為 Buffer
+        let vBuffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, vBuffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(positions), this.gl.STATIC_DRAW);
+
+        let nBuffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, nBuffer);
+        this.gl.bufferData(this.gl.ARRAY_BUFFER, new Float32Array(normals), this.gl.STATIC_DRAW);
+
+        let iBuffer = this.gl.createBuffer();
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, iBuffer);
+        // 球體頂點數通常超過 256，必須用 Uint16Array (UNSIGNED_SHORT)
+        this.gl.bufferData(this.gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), this.gl.STATIC_DRAW);
+
+        this.sphereBufferInfo = { 
+            vertexBuffer: vBuffer, 
+            normalBuffer: nBuffer, 
+            indexBuffer: iBuffer,
+            indexCount: indices.length 
+        };
+    },
+
+    drawSphere: function(proj, view, tx, ty, tz, sx, sy, sz, r, g, b) {
+        let modelMatrix = new Matrix4();
+        modelMatrix.translate(tx, ty, tz);
+        modelMatrix.scale(sx, sy, sz); // 球體的縮放就是它的半徑
+
+        let mvpMatrix = new Matrix4();
+        mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
+        let normalMatrix = new Matrix4();
+        normalMatrix.setInverseOf(modelMatrix).transpose();
+
+        let gl = this.gl;
+        gl.useProgram(this.program);
+
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_UseTexture'), 0); // 關閉貼圖
+        gl.uniform3f(gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b); // 設定底色
+
+        // 🔥【核心新增】開啟環境貼圖反射！傳入 0.9 的極高強度（模擬水晶/電鍍質感）
+        gl.uniform1f(gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 0.9);
+        
+        // 傳遞天空盒紋理（在TEXTURE1）給主 Shader
+        gl.activeTexture(gl.TEXTURE1);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.skyboxTexture);
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_SkyboxSampler'), 1);
+
+        // 傳遞矩陣
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
+
+        // 綁定球體 Buffer
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.sphereBufferInfo.vertexBuffer);
+        let a_Position = gl.getAttribLocation(this.program, 'a_Position');
+        gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Position);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.sphereBufferInfo.normalBuffer);
+        let a_Normal = gl.getAttribLocation(this.program, 'a_Normal');
+        gl.vertexAttribPointer(a_Normal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(a_Normal);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.sphereBufferInfo.indexBuffer);
+        // 使用 UNSIGNED_SHORT 繪製超過 256 個頂點的模型
+        gl.drawElements(gl.TRIANGLES, this.sphereBufferInfo.indexCount, gl.UNSIGNED_SHORT, 0);
+    },
+
+    drawSkybox: function(proj, view, camX, camY, camZ) {
         if (!this.skyboxTexture) return; 
 
         let gl = this.gl;
@@ -699,6 +803,8 @@ drawSkybox: function(proj, view, camX, camY, camZ) {
         this.drawBlock(projMatrix, viewMatrix, -1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 左桌腳
         this.drawBlock(projMatrix, viewMatrix,  1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 右桌腳
 
+        this.drawSphere(projMatrix, viewMatrix, -1.0, 1.2, 11.0,  0.15, 0.15, 0.15,  1.0, 1.0, 1.0);
+        //this.drawBlock(projMatrix, viewMatrix,  -1.0, 0.6, 15.0,  0.15, 0.075 , 0.15,  0.4, 0.2, 0.1);
         // 3. 正前方牆壁 (包含 Window 和 Door 1) - Z=9
         // 窗戶左邊的牆
         this.drawBlock(projMatrix, viewMatrix, -3.0, 2.5, 8,  0.75, 2.5, 0.2,  0.2, 0.3, 0.3); 
