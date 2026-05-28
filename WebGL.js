@@ -20,7 +20,6 @@ const Renderer = {
     }
     `,
 
-    // 請將 FSHADER_SOURCE 替換為以下內容
     FSHADER_SOURCE: `
     precision mediump float;
     varying vec3 v_Normal;
@@ -30,19 +29,23 @@ const Renderer = {
     varying vec3 v_Position; 
     uniform bool u_UseTexture; 
 
-    // --- Phong 高光需要的變數 ---
-    uniform vec3 u_EyePos;          // 攝影機（眼睛）在真實世界的位置
-    uniform float u_Shininess;      // 高光反光的粗糙度
-    uniform vec3 u_MaterialSpecular;// 材質高光顏色
+    // 高光需要的變數
+    uniform vec3 u_EyePos;          
+    uniform float u_Shininess;      
+    uniform vec3 u_MaterialSpecular;
 
-    // --- 新增：環境貼圖反射需要的變數 ---
-    uniform samplerCube u_SkyboxSampler; // 用來讀取 Skybox 貼圖
-    uniform float u_EnvReflectWeight;   // 反射強度開關 (0.0 代表一般物體，0.0~1.0 代表鏡面反射強度)
+    // 環境貼圖反射需要的變數
+    uniform samplerCube u_SkyboxSampler; 
+    uniform float u_EnvReflectWeight;   
 
-    #define NUM_LIGHTS 11 // 宣告這個世界最多有 11 盞燈！
+    // 探照燈陰影需要的變數 
+    uniform sampler2D u_ShadowMap;      // 剛剛畫好的右門燈深度貼圖
+    uniform mat4 u_LightMvpMatrix;      // 右門燈的 MVP 矩陣（用來把世界座標轉向光源視角）
 
-    uniform vec3 u_LightPos[NUM_LIGHTS];   // 11 個位置
-    uniform vec3 u_LightColor[NUM_LIGHTS]; // 11 個顏色
+    #define NUM_LIGHTS 11 
+
+    uniform vec3 u_LightPos[NUM_LIGHTS];   
+    uniform vec3 u_LightColor[NUM_LIGHTS]; 
 
     void main() {
         vec4 color;
@@ -53,46 +56,68 @@ const Renderer = {
         }
         
         vec3 normal = normalize(v_Normal);
-        // 計算從物體表面指向攝影機的視角向量 V
         vec3 viewDir = normalize(u_EyePos - v_Position);
 
-        vec3 totalDiffuse = vec3(0.0); // 收集漫反射
-        vec3 totalSpecular = vec3(0.0); // 用來收集所有燈泡的高光！
+        // 1. 將真實世界座標乘以右門燈的 MVP，得到光源空間下的座標
+        vec4 posFromLight = u_LightMvpMatrix * vec4(v_Position, 1.0);
+        // 2. 進行透視除法，轉為 [-1, 1] 裁剪座標
+        vec3 shadowCoord = (posFromLight.xyz / posFromLight.w) * 0.5 + 0.5;
+        
+        // 3. 讀取 Shadow Map 中紀錄的最近深度
+        float depthInShadowMap = texture2D(u_ShadowMap, shadowCoord.xy).r;
+        // 當前物體實際到光源的深度
+        float currentDepth = shadowCoord.z;
+        
+        // 4. 對比深度（加上 0.005 的 Shadow Bias 偏置，防止發生經典的 Shadow Acne 陰影粉刺破圖）
+        float shadowWeight = 1.0;
+        if (shadowCoord.x >= 0.0 && shadowCoord.x <= 1.0 && shadowCoord.y >= 0.0 && shadowCoord.y <= 1.0) {
+            if (depthInShadowMap < currentDepth - 0.005) {
+                shadowWeight = 0.15; // 處於陰影區！將這盞燈的光照強度壓低到 15% (留下一點微弱環境光，看起來更寫實)
+            }
+        }
 
-        // 迴圈：計算 11 盞燈的衰減、漫反射與高光
+        vec3 totalDiffuse = vec3(0.0); 
+        vec3 totalSpecular = vec3(0.0); 
+
+        // 計算 11 盞燈
         for(int i = 0; i < NUM_LIGHTS; i++) {
             vec3 lightDir = u_LightPos[i] - v_Position;
             float distance = length(lightDir);
             lightDir = normalize(lightDir);
 
-            // 1. 漫反射計算 (nDotL)
             float nDotL = max(dot(normal, lightDir), 0.0);
             float attenuation = 1.0 / (1.0 + 0.15 * distance + 0.05 * (distance * distance));
             
-            totalDiffuse += u_LightColor[i] * color.rgb * nDotL * attenuation;
-
-            // 2. 高光計算 (Phong Shading)
+            // 漫反射累加
+            vec3 diff = u_LightColor[i] * color.rgb * nDotL * attenuation;
+            
+            // 高光累加
+            vec3 spec = vec3(0.0);
             if (nDotL > 0.0) {
                 vec3 reflectDir = reflect(-lightDir, normal);
                 float rDotV = max(dot(reflectDir, viewDir), 0.0);
                 float specularWeight = pow(rDotV, u_Shininess);
-                totalSpecular += u_LightColor[i] * u_MaterialSpecular * specularWeight * attenuation;
+                spec = u_LightColor[i] * u_MaterialSpecular * specularWeight * attenuation;
             }
+
+            // 如果是右門探照燈（也就是你的燈 7，前/右燈），強行乘以陰影權重！
+            if (i == 7) {
+                diff *= shadowWeight;
+                spec *= shadowWeight;
+            }
+
+            totalDiffuse += diff;
+            totalSpecular += spec;
         }
 
-        // 環境光 (底色)
         vec3 ambient = color.rgb * 0.02; 
-        
-        // 基礎光照總和
         vec3 lightingColor = ambient + totalDiffuse + totalSpecular;
 
-        // 【核心新增】計算環境貼圖鏡面反射
-        // 使用 reflect() 函數，根據「眼睛看像物體的方向」與「法向量」算出射向天空盒的反射方向
-        vec3 incidentDir = normalize(v_Position - u_EyePos); // 視線入射方向
+        // 環境反射
+        vec3 incidentDir = normalize(v_Position - u_EyePos); 
         vec3 envReflectDir = reflect(incidentDir, normal);
         vec4 reflectColor = textureCube(u_SkyboxSampler, envReflectDir);
 
-        // 根據權重混合原本的光照底色與反射出來的天空盒顏色
         vec3 finalColor = mix(lightingColor, reflectColor.rgb, u_EnvReflectWeight);
         
         gl_FragColor = vec4(finalColor, color.a);
@@ -119,6 +144,27 @@ const Renderer = {
     }
     `,
 
+    SHADOW_VSHADER: `
+    attribute vec4 a_Position;
+    uniform mat4 u_MvpMatrix;
+    varying vec4 v_PositionFromLight;
+    void main() {
+        gl_Position = u_MvpMatrix * a_Position;
+        v_PositionFromLight = gl_Position; // 把光源視角下的裁剪座標傳給片段著色器
+    }
+    `,
+
+    SHADOW_FSHADER: `
+    precision mediump float;
+    varying vec4 v_PositionFromLight;
+    void main() {
+        // 將深度值 (Z/W) 從 [-1, 1] 對齊到 [0, 1] 的區間，並存入 RGBA 的 R 通道（或是直接利用高精度深度）
+        // WebGL 預設會自動處理深度緩衝區，這裡我們直接塗一個顏色，核心由 WebGL 深度測試幫我們記錄
+        gl_FragColor = vec4(vec3(v_PositionFromLight.z / v_PositionFromLight.w * 0.5 + 0.5), 1.0);
+    }
+    `,
+
+    shadowProgram: null, // 用來存編譯好的陰影著色器程式
     skyboxProgram: null, // 用來存編譯好的 Skybox 著色器程式
 
     init: function(canvasId) {
@@ -129,13 +175,50 @@ const Renderer = {
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.enable(this.gl.BLEND);
         this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
+        // 初始化五兄弟
         this.initCube();
         this.initCylinder();
         this.initSphere();
+        this.initDynamicCubeMap();
+        this.initShadowFramebuffer();
+        //
         this.resizeCanvas();
         this.skyboxProgram = this.compileShader(this.SKYBOX_VSHADER, this.SKYBOX_FSHADER);
+        this.shadowProgram = this.compileShader(this.SHADOW_VSHADER, this.SHADOW_FSHADER);
         window.addEventListener('resize', () => this.resizeCanvas());
         return true;
+    },
+
+    shadowFramebuffer: null,
+    shadowDepthTexture: null,
+    shadowMapSize: 1024, // 陰影解析度，1024x1024 鋸齒感較低，RTX 4060 跑這個輕輕鬆鬆
+
+    initShadowFramebuffer: function() {
+        let gl = this.gl;
+
+        // 1. 建立 Framebuffer
+        this.shadowFramebuffer = gl.createFramebuffer();
+
+        // 2. 建立一組高品質的 2D 紋理用來存深度
+        this.shadowDepthTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, this.shadowDepthTexture);
+        // 注意：這裡使用 DEPTH_COMPONENT 讓 WebGL 專門用來存高精度深度值
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT16, this.shadowMapSize, this.shadowMapSize, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
+        
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        // 3. 把這張深度貼圖綁定給 Framebuffer 的 DEPTH_ATTACHMENT
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.TEXTURE_2D, this.shadowDepthTexture, 0);
+
+        // 核心安全檢查：WebGL 要求如果不畫顏色，必須明確告訴 Framebuffer 不要寫入顏色緩衝區
+        // 在 WebGL 1 / WebGL 2 中，我們可以綁定一個空的或不做 color attachment，並確保不引發不完整報錯
+
+        gl.bindTexture(gl.TEXTURE_2D, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     },
 
     resizeCanvas: function() {
@@ -211,6 +294,166 @@ const Renderer = {
         };
     },
 
+    drawScene: function(projMatrix, viewMatrix, gameState) {
+        // --- 這裡放你原本 draw 裡面的所有 Blockout 與繪製邏輯 ---
+
+        // 1. 警衛室地板
+        this.drawBlock(projMatrix, viewMatrix, 0, 0, 11,  4, 0.1, 3,  0.3, 0.3, 0.3);
+        // 2. 辦公桌
+        this.drawBlock(projMatrix, viewMatrix, 0, 1, 10,  1.5, 0.1, 0.5,  0.4, 0.2, 0.1);
+        this.drawBlock(projMatrix, viewMatrix, -1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix,  1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); 
+
+        // ⭐ 水晶球底座（留著底座，不要在這裡畫 drawSphere 喔！）
+        this.drawBlock(projMatrix, viewMatrix,  -0.6, 1.1, 10.0,  0.15, 0.01 , 0.15,  0.4, 0.2, 0.1);
+
+        // 3. 正前方牆壁
+        this.drawBlock(projMatrix, viewMatrix, -3.0, 2.5, 8,  0.75, 2.5, 0.2,  0.2, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, -1.5, 0.8, 8,  1.5, 0.8, 0.2,  0.2, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, -1.5, 4.2, 8,  1.5, 0.8, 0.2,  0.2, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 0.5, 2.5, 8,  0.5, 2.5, 0.2,  0.2, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 2, 4, 8,  1, 1, 0.2,  0.2, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 3.5, 2.5, 8,  0.5, 2.5, 0.2,  0.2, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 2, gameState.rightDoorY, 8, 1.25 ,2 , 0.15,  0.2, 0.25, 0.3);
+
+        // 4. 左邊牆壁
+        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 9,  0.2, 2.5, 1,  0.2, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 13.0, 0.2, 2.5, 1.0, 0.2, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, -4, 4, 11.25,  0.2, 1, 1.3, 0.2, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, -4, gameState.leftDoorY, 11.25,  0.15, 1.5, 1.1,  0.2, 0.25, 0.3);
+
+        // 5. 右邊牆壁
+        this.drawBlock(projMatrix, viewMatrix, 4, 2.5, 11,  0.2, 2.5, 3,  0.2, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 3.8, 1.0, 12,  0.3, 1, 1,  0.05, 0.05, 0.05); 
+        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 14,  4, 2.5, 0.2,  0.2, 0.3, 0.3);
+
+        // 大地板與圍牆
+        this.drawBlock(projMatrix, viewMatrix, 0, -0.05, -10,  25, 0.1, 25 ,  0.2, 0.2, 0.25);
+        this.drawBlock(projMatrix, viewMatrix, 30, -0.05, -10,  15, 0.1, 25 ,  0.2, 0.2, 0.25); 
+        this.drawBlock(projMatrix, viewMatrix, 0, -0.05, 30,  25, 0.1, 25 ,  0.2, 0.2, 0.25);
+        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, -35,  25, 2.5, 0.5,   0.5, 0.15, 0.15);
+        this.drawBlock(projMatrix, viewMatrix, -25, 2.5, -10,  0.5, 2.5, 25,  0.5, 0.15, 0.15);
+        this.drawBlock(projMatrix, viewMatrix, 25, 2.5, -10,  0.5, 2.5, 25,  0.5, 0.15, 0.15);
+        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 15,  25, 2.5, 0.5,   0.5, 0.15, 0.15);
+
+        // 用餐區長桌
+        this.drawBlock(projMatrix, viewMatrix, -7.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, -3.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, 3.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, 7.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, -7.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, -3.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, 3.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, 7.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); 
+        this.drawBlock(projMatrix, viewMatrix, 18, 2, -16,  2.0 , 0.1, 5,   1, 0.5, 1); 
+        this.drawBlock(projMatrix, viewMatrix, 18, 1, -16,  1 , 1, 1,    1, 0.5, 1);
+
+        // 舞台與海盜灣
+        this.drawBlock(projMatrix, viewMatrix, 0, 0.5, -32,  10, 0.5, 2.5,   0.3, 0.2, 0.1);
+        this.drawBlock(projMatrix, viewMatrix, 0, 3, -34.5,  8.5, 4, 0.2,   0.1, 0.1, 0.1);
+        this.drawCylinder(projMatrix, viewMatrix, -18, 0.5, -18,  3.0, 0.5, 3.0,  0.2, 0.1, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, -18, 2, -21,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
+        this.drawBlock(projMatrix, viewMatrix, -21.5, 2, -18,  0.2, 2.5, 3.5,   0.3, 0.1, 0.4);
+        this.drawBlock(projMatrix, viewMatrix, -18, 2, -15,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
+
+        // 隔壁與通風管
+        this.drawBlock(projMatrix, viewMatrix, -11, 2.5, 2,  8, 2.5, 0.2,  0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix,  14, 2.5, 2,  11, 2.5, 0.2,  0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, -4.5,  10, 2.5, 0.2,  0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix, -3.2, 2.5, 5,  0.2, 2.5, 3,   0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix,  3.2, 2.5, 5,  0.2, 2.5, 3,   0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix, -11, 2.5, 9, 7, 2.5, 0.2,  0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix, -5.5, 2.5, 5.5,  0.2, 2.5, 3.5,   0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix, -17.8, 2.5, 7.5,  0.2, 2.5, 1.5,   0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix, -17.8, 2.5, 2.8,  0.2, 2.5, 0.75,   0.5, 0.15, 0.15); 
+        this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 10,  11, 1.5, 0.2, 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  15, 3, 11.5,  11, 0.2 , 1.5 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 13,  11, 1.5, 0.2, 0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix,  25, 1.5, -14,  2, 1.5, 0.2, 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  25, 3, -12.5,  2, 0.2 , 1.5 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix,  25, 1.5, -11,  2, 1.5, 0.2, 0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 24, 1.5, -12.5,  0.1, 1.3 , 1.3 , 0, 0, 0); 
+        this.drawBlock(projMatrix, viewMatrix, 26, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 27.5, 3, -10,  1.5, 0.2 , 25 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 29, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 11, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 12.5, 3, 5.5,  1.5, 0.2 , 4.5 , 0.3, 0.3, 0.3); 
+        this.drawBlock(projMatrix, viewMatrix, 14, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
+        this.drawBlock(projMatrix, viewMatrix, 12.5, 1.5, 1,  1.3, 1.3 , 0.1 , 0, 0, 0); 
+
+        // 電風扇
+        let fX = 0.8, fY = 1.1, fZ = 10.1; 
+        this.drawCylinder(projMatrix, viewMatrix, fX, fY, fZ, 0.15, 0.02, 0.15, 0.2, 0.2, 0.2);
+        this.drawCylinder(projMatrix, viewMatrix, fX, fY + 0.1, fZ, 0.02, 0.1, 0.02, 0.2, 0.2, 0.2);
+        this.drawBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ, 0.08, 0.08, 0.1, 0.2, 0.2, 0.2);
+        this.drawRotatedBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ + 0.11, 0.02, 0.15, 0.01, gameState.fanAngle, 0.05, 0.05, 0.05);
+        this.drawRotatedBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ + 0.11, 0.15, 0.02, 0.01, gameState.fanAngle, 0.05, 0.05, 0.05);
+
+        // 畫四隻熊熊（Bonnie, Freddy, Chica, Foxy... 直接借用你原本代碼中的渲染邏輯）
+        this.drawAnimatronics(projMatrix, viewMatrix, gameState);
+    },
+
+    // 輔助拆分函數：把熊熊渲染包進來
+    drawAnimatronics: function(projMatrix, viewMatrix, gameState) {
+        if (Renderer.models && Renderer.models.bonnieNormal) {
+            let bLoc = gameState.bonnie.location; let bScale = 0.04;
+            let currentBonnie = Renderer.models.bonnieNormal;
+            if (bLoc === 'cam1') this.drawCharacter(projMatrix, viewMatrix, -4, 1, -32, bScale, bScale, bScale, 0, currentBonnie); 
+            else if (bLoc === 'cam2') this.drawCharacter(projMatrix, viewMatrix, 0, 1, -11, bScale, bScale, bScale, -30, Renderer.models.bonnieCam2); 
+            else if (bLoc === 'cam4') this.drawCharacter(projMatrix, viewMatrix, 8, 1, 2, bScale, bScale, bScale, -45, currentBonnie); 
+            else if (bLoc === 'cam6') this.drawCharacter(projMatrix, viewMatrix, -18, 0, 13, bScale, bScale, bScale, 90, Renderer.models.bonnieCam6); 
+            else if (bLoc === 'cam7') this.drawCharacter(projMatrix, viewMatrix, -11, 0, 7.8, bScale, bScale, bScale, 145, Renderer.models.bonnieCam7);  
+            else if (bLoc === 'door' && gameState.leftLightOn) this.drawCharacter(projMatrix, viewMatrix, -5.5, 0, 11, 0.03, 0.03, 0.03, 90, currentBonnie); 
+            else if (bLoc === 'jumpscare') {
+                let shakeX = Math.sin(gameState.time * 50) * 0.1; let shakeY = Math.cos(gameState.time * 70) * 0.1;
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -1 + shakeY, 11, 0.03, 0.03, 0.03, 0, Renderer.models.bonnieAttack); 
+            }
+        }
+        if (Renderer.models && Renderer.models.freddyNormal) {
+            let loc = gameState.freddy.location; let fScale = 1.8;
+            if (loc === 'cam1') this.drawCharacter(projMatrix, viewMatrix, 3, 1, -32, fScale, fScale, fScale, 0, Renderer.models.freddyNormal); 
+            else if(loc === 'cam2') this.drawCharacter(projMatrix, viewMatrix, 10, 0, -18, fScale, fScale, fScale, 55, Renderer.models.freddyNormal); 
+            else if(loc === 'cam5') this.drawCharacter(projMatrix, viewMatrix, 21, 0, -10, fScale, fScale, fScale, 135, Renderer.models.freddyDown); 
+            else if(loc === 'cam8') this.drawCharacter(projMatrix, viewMatrix, 27.5, 0, 6, 1.4, 1.4, 1.4, 0, Renderer.models.freddyVent); 
+            else if(loc === 'cam4') this.drawCharacter(projMatrix, viewMatrix, 7, 0, 0, fScale, fScale, fScale, 180, Renderer.models.freddyOut); 
+            else if (loc === 'door' && gameState.powerOutPhase === 1) this.drawCharacter(projMatrix, viewMatrix, -0.5, 0, 5, fScale, fScale, fScale, 0, Renderer.models.freddyAttack);
+            else if (loc === 'jumpscare') {
+                let shakeX = Math.sin(gameState.time * 50) * 0.1; let shakeY = Math.cos(gameState.time * 70) * 0.1;
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale, fScale, 0, Renderer.models.freddyAttack); 
+            }
+        }
+        if (Renderer.models && Renderer.models.chicaNormal) {
+            let loc = gameState.chica.location; let CScale = 0.045;
+            if (loc === 'cam1') this.drawCharacter(projMatrix, viewMatrix, 0, 1, -32, CScale, CScale, CScale, 0, Renderer.models.chicaNormal); 
+            else if(loc === 'cam2') this.drawCharacter(projMatrix, viewMatrix, -2, 0, -9, CScale, CScale, CScale, 90, Renderer.models.chicaCam2); 
+            else if(loc === 'cam4') this.drawCharacter(projMatrix, viewMatrix, 9, 0, -3, CScale, CScale, CScale, 200 , Renderer.models.chicaCam4); 
+            else if (loc === 'door' && gameState.rightLightOn) this.drawCharacter(projMatrix, viewMatrix, -0.5, 0, 5, CScale, CScale, CScale, 0, Renderer.models.chicaNormal); 
+            else if (loc === 'jumpscare') {
+                let shakeX = Math.sin(gameState.time * 50) * 0.1; let shakeY = Math.cos(gameState.time * 70) * 0.1;
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, CScale, CScale, CScale, 0, Renderer.models.chicaAttack); 
+            }
+        }
+        if (Renderer.models && Renderer.models.foxyNormal) {
+            let loc = gameState.foxy.location; let foxyScale = 0.2;
+            if (loc === 'cam3') {
+                let m = Renderer.models.foxyNormal;
+                if(gameState.foxy.phase === 1) m = Renderer.models.foxyP1;
+                else if(gameState.foxy.phase === 2) m = Renderer.models.foxyP2;
+                else if(gameState.foxy.phase === 3) m = Renderer.models.foxyP3;
+                this.drawCharacter(projMatrix, viewMatrix, -18, 1, -18, foxyScale, foxyScale, foxyScale, 90, m); 
+            } else if (loc === 'cam6') {
+                let isLeftFoot = Math.floor(Date.now() / 150) % 2 === 0; 
+                let currentModel = isLeftFoot ? Renderer.models.foxyL : Renderer.models.foxyR;
+                let currentX = -18 + (16) * (gameState.foxy.runProgress || 0);
+                if (currentModel) this.drawCharacter(projMatrix, viewMatrix, currentX, 0, 11, foxyScale, foxyScale, foxyScale, 90, currentModel);
+            } else if (loc === 'jumpscare') {
+                let shakeX = Math.sin(gameState.time * 50) * 0.1; let shakeY = Math.cos(gameState.time * 70) * 0.1;
+                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, foxyScale, foxyScale, foxyScale, 0, Renderer.models.foxyNormal); 
+            }
+        }
+    },
+
+
     initSphere: function() {
         let segments = 32; // 分段數，越多越圓滑
         let positions = [];
@@ -271,7 +514,7 @@ const Renderer = {
     drawSphere: function(proj, view, tx, ty, tz, sx, sy, sz, r, g, b) {
         let modelMatrix = new Matrix4();
         modelMatrix.translate(tx, ty, tz);
-        modelMatrix.scale(sx, sy, sz); // 球體的縮放就是它的半徑
+        modelMatrix.scale(sx, sy, sz); 
 
         let mvpMatrix = new Matrix4();
         mvpMatrix.set(proj).multiply(view).multiply(modelMatrix);
@@ -281,23 +524,21 @@ const Renderer = {
         let gl = this.gl;
         gl.useProgram(this.program);
 
-        gl.uniform1i(gl.getUniformLocation(this.program, 'u_UseTexture'), 0); // 關閉貼圖
-        gl.uniform3f(gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b); // 設定底色
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_UseTexture'), 0); 
+        gl.uniform3f(gl.getUniformLocation(this.program, 'u_BaseColor'), r, g, b); 
 
-        // 🔥【核心新增】開啟環境貼圖反射！傳入 0.9 的極高強度（模擬水晶/電鍍質感）
-        gl.uniform1f(gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 0.9);
+        // 強度拉到 1.0 純鏡面！
+        gl.uniform1f(gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 1.0);
         
-        // 傳遞天空盒紋理（在TEXTURE1）給主 Shader
-        gl.activeTexture(gl.TEXTURE1);
-        gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.skyboxTexture);
-        gl.uniform1i(gl.getUniformLocation(this.program, 'u_SkyboxSampler'), 1);
+        // 【動態鏡面核心】綁定我們自己動態渲染出來的 dynamicCubeTexture！
+        gl.activeTexture(gl.TEXTURE2);
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.dynamicCubeTexture);
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_SkyboxSampler'), 2); // 告訴 Shader 讀取單元 2
 
-        // 傳遞矩陣
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_ModelMatrix'), false, modelMatrix.elements);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_normalMatrix'), false, normalMatrix.elements);
 
-        // 綁定球體 Buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, this.sphereBufferInfo.vertexBuffer);
         let a_Position = gl.getAttribLocation(this.program, 'a_Position');
         gl.vertexAttribPointer(a_Position, 3, gl.FLOAT, false, 0, 0);
@@ -309,7 +550,6 @@ const Renderer = {
         gl.enableVertexAttribArray(a_Normal);
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.sphereBufferInfo.indexBuffer);
-        // 使用 UNSIGNED_SHORT 繪製超過 256 個頂點的模型
         gl.drawElements(gl.TRIANGLES, this.sphereBufferInfo.indexCount, gl.UNSIGNED_SHORT, 0);
     },
 
@@ -405,8 +645,47 @@ const Renderer = {
     
 
     textures: {},
-
+    dynamicFramebuffer: null,
+    dynamicCubeTexture: null,
+    dynamicCubeMapSize: 512, // 鏡面解析度，512x512 效果極佳且兼顧效能
     
+
+    initDynamicCubeMap: function() {
+        let gl = this.gl;
+        
+        // 1. 建立 Framebuffer
+        this.dynamicFramebuffer = gl.createFramebuffer();
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.dynamicFramebuffer);
+
+        // 2. 建立動態遠端環境 Cube Map 紋理
+        this.dynamicCubeTexture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, this.dynamicCubeTexture);
+
+        // 初始化 6 個面向（先留空，等著每幀寫入）
+        for (let i = 0; i < 6; i++) {
+            gl.texImage2D(
+                gl.TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, 
+                gl.RGBA, this.dynamicCubeMapSize, this.dynamicCubeMapSize, 0, 
+                gl.RGBA, gl.UNSIGNED_BYTE, null
+            );
+        }
+
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+        // 3. 建立渲染緩衝區（Depth Buffer），用於 6 個面向渲染時的深度測試
+        let renderbuffer = gl.createRenderbuffer();
+        gl.bindRenderbuffer(gl.RENDERBUFFER, renderbuffer);
+        gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT16, this.dynamicCubeMapSize, this.dynamicCubeMapSize);
+        gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, renderbuffer);
+
+        // 解除綁定
+        gl.bindTexture(gl.TEXTURE_CUBE_MAP, null);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    },
+
 
     // WebGL.js 內部，放在 loadTexture 下方// WebGL.js 內部，放在 loadTexture 下方// WebGL.js 內部，放在 loadTexture 下方
     loadCubeMap: function(urlsOrPath) {
@@ -414,7 +693,7 @@ const Renderer = {
         let texture = gl.createTexture();
         gl.bindTexture(gl.TEXTURE_CUBE_MAP, texture);
 
-        // 🌟 自動相容轉換：如果傳進來的是字串 'assets'，自動拼裝 6 個面的路徑
+        //  自動相容轉換：如果傳進來的是字串 'assets'，自動拼裝 6 個面的路徑
         let urls = {};
         if (typeof urlsOrPath === 'string') {
             let basePath = urlsOrPath.endsWith('/') ? urlsOrPath : urlsOrPath + '/';
@@ -449,7 +728,7 @@ const Renderer = {
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_CUBE_MAP, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
-        let loadedCount = 0; // 🌟 新增：載入計數器
+        let loadedCount = 0; //  新增：載入計數器
 
         targets.forEach((item) => {
             let image = new Image();
@@ -458,7 +737,7 @@ const Renderer = {
                 gl.texImage2D(item.target, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
                 loadedCount++; // 每載入一張就 +1
                 
-                // 🌟 核心修正：必須等 6 張都載入完畢，才能呼叫 Mipmap 組裝！
+                //  核心修正：必須等 6 張都載入完畢，才能呼叫 Mipmap 組裝！
                 if (loadedCount === 6) {
                     gl.generateMipmap(gl.TEXTURE_CUBE_MAP);
                     console.log("🌌 Skybox 6張圖片全部載入並組合完成！");
@@ -475,7 +754,7 @@ const Renderer = {
     },
     skyboxTexture: null,
 
-    // 專門為了電風扇發明的新技能：畫出會自轉的方塊！
+
     drawRotatedBlock: function(proj, view, tx, ty, tz, sx, sy, sz, angle, r, g, b) {
         let modelMatrix = new Matrix4();
         modelMatrix.translate(tx, ty, tz);      
@@ -572,587 +851,162 @@ const Renderer = {
 
 
 
+draw: function(gameState) {
+        let gl = this.gl;
 
-    draw: function(gameState) {
-        this.gl.clearColor(0.05, 0.05, 0.05, 1.0); // 建議把背景色調暗一點
-        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-        this.gl.useProgram(this.program);
+        // ----------------------------------------------------
+        // 🔥【通道 0】SHADOW MAP PASS (從右門探照燈視角計算陰影)
+        // ----------------------------------------------------
+        // 右門探照燈的世界座標 (從你的燈 7 陣列中提取)
+        let lX = 0.0, lY = 4.0, lZ = 6.0; 
+
+        let shadowProj = new Matrix4();
+        let shadowView = new Matrix4();
+        // 探照燈具有方向性，利用 perspective 模擬聚光燈圓錐，視野設為 90 度，遠景 50 即可
+        shadowProj.setPerspective(90, 1.0, 0.1, 50);
+        // 讓探照燈精準看向右側牆壁門口的方向（朝 X 軸正方向、Z 軸稍靠後看過去）
+        shadowView.setLookAt(lX, lY, lZ,  4.0, 1.5, 10.0,  0, 1, 0);
+
+        let lightMvpMatrix = new Matrix4();
+        // 這是光源專用的 MVP 基礎（此處不包含 Model，在物體繪製時會各自 multiply）
+        lightMvpMatrix.set(shadowProj).multiply(shadowView);
+
+        // 綁定到陰影 Framebuffer
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.shadowFramebuffer);
+        gl.viewport(0, 0, this.shadowMapSize, this.shadowMapSize);
+        gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
+
+        // 切換到輕量級的 shadowProgram
+        gl.useProgram(this.shadowProgram);
+
+        // 🟢 核心加工：利用你原有的 drawScene 函數，但暫時用影子 Shader 跑一次
+        // 為了不破壞原本函數的 Shader 綁定，我們需要讓 drawBlock 等函數知道現在是在畫影子還是畫彩色。
+        // 最快速安全的解法是：在 Renderer 上掛一個標記 Renderer.isDrawingShadow = true;
+        this.isDrawingShadow = true;
+        this.drawScene(shadowProj, shadowView, gameState);
+        this.isDrawingShadow = false; // 畫完影子，立刻解開標記
 
 
-        // 圖學燈光系統：保安室頂燈
+        // ----------------------------------------------------
+        // 🔄【通道 1 ~ 6】DYNAMIC CUBE MAP PASS (保持原本的水晶球反射不變)
+        // ----------------------------------------------------
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.dynamicFramebuffer);
+        gl.viewport(0, 0, this.dynamicCubeMapSize, this.dynamicCubeMapSize);
+        let dynProj = new Matrix4();
+        dynProj.setPerspective(90, 1.0, 0.1, 100);
+        let sX = -0.6, sY = 1.3, sZ = 10.0;
+        const cubeFaces = [
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_X, look: [sX+1, sY, sZ],  up: [0, -1, 0] },
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_X, look: [sX-1, sY, sZ],  up: [0, -1, 0] },
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Y, look: [sX, sY+1, sZ],  up: [0, 0, 1]  },
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Y, look: [sX, sY-1, sZ],  up: [0, 0, -1] },
+            { target: gl.TEXTURE_CUBE_MAP_POSITIVE_Z, look: [sX, sY, sZ+1],  up: [0, -1, 0] },
+            { target: gl.TEXTURE_CUBE_MAP_NEGATIVE_Z, look: [sX, sY, sZ-1],  up: [0, -1, 0] }
+        ];
+        gl.useProgram(this.program);
+        this.setupLights(gameState);
+        cubeFaces.forEach(face => {
+            gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, face.target, this.dynamicCubeTexture, 0);
+            gl.clearColor(0.05, 0.05, 0.05, 1.0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            let dynView = new Matrix4();
+            dynView.setLookAt(sX, sY, sZ, face.look[0], face.look[1], face.look[2], face.up[0], face.up[1], face.up[2]);
+            this.drawSkybox(dynProj, dynView, sX, sY, sZ);
+            gl.useProgram(this.program);
+            // 在主 Shader 中傳入光的 MVP 矩陣，避免場景繪製出錯
+            gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_LightMvpMatrix'), false, lightMvpMatrix.elements);
+            this.drawScene(dynProj, dynView, gameState);
+        });
 
-        // 圖學燈光系統：全區 10 盞燈陣列
-  
-        
-        let officeR = 1.6, officeG = 1.4, officeB = 1.0; // 正常微黃光
 
-        if (gameState.isPowerOut) {
-            if (gameState.powerOutPhase === 1) {
-                // 停電第一階段：Freddy 唱歌時，給予微弱且隨機閃爍的光 (模擬月光或微弱備用電)
-                let flicker = (Math.random() > 0.5) ? 0.15 : 0.02;
-                officeR = flicker; officeG = flicker; officeB = flicker;
-            } else if (gameState.powerOutPhase === 2){
-                // 停電第二與第三階段：全黑死寂
-                officeR = 0.3; officeG = 0.3; officeB = 0.3;
-            }else if (gameState.powerOutPhase === 3){
-                officeR = 1.0; officeG = 1.0; officeB = 1.0;
-            }
-        }
+        // ----------------------------------------------------
+        // 🟢【通道 7】FINAL PASS (最終玩家螢幕畫面)
+        // ----------------------------------------------------
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        this.resizeCanvas();
+        gl.clearColor(0.05, 0.05, 0.05, 1.0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        // 準備 10 個燈泡的座標 [X, Y, Z,  X, Y, Z...] (總共 30 個數字)
-        let lightPositions = new Float32Array([
-            0.0, 4.5, 10.0,   // 燈 0：保安室
-            0.0, 6, -32.0,  // 燈 1：主舞台 (Cam 1)
-            -18.0, 3.5, -18.0,// 燈 2：海盜灣 (Cam 3)
-            -23, 2, 9,  // 燈 3：左側走廊 (Cam 6)
-            10, 4, 2,   // 燈 4：右側走廊 (Cam 4)
-            0, 1, -12,  // 燈 5：用餐區 (Cam 2)
-            // 下面是還沒用到的備用燈泡，先把它們丟到很遠的地方
-            -5.0, 4, 11.25,    // 燈 6 左燈
-            0.0, 4, 6.0,    // 燈 7 前燈
-            -16, 1, 6,    // 燈 8
-            18, 2,-16,     // 燈 9 DJ
-            -1.5, 2, 9
-        ]);
-
-        // 準備 10 個燈泡的顏色 [R, G, B,  R, G, B...] (總共 30 個數字)
-        let lightColors = new Float32Array([
-            officeR, officeG, officeB,  // 燈 0：保安室 (微弱黃光)
-            1.6, 1.6, 2.4,  // 燈 1：主舞台 (帶點詭異的冷藍光)
-            1.0, 0.1, 0.1,  // 燈 2：海盜灣 (壓迫感極重的暗紅光)
-            !gameState.isPowerOut ? 0.7 : 0.0,
-            !gameState.isPowerOut ? 0.7 : 0.0,
-            !gameState.isPowerOut ? 0.7 : 0.0,  // 燈 3：左側走廊 (微弱白光)
-            !gameState.isPowerOut ? 0.7 : 0.0,
-            !gameState.isPowerOut ? 0.7 : 0.0,
-            !gameState.isPowerOut ? 0.7 : 0.0,
-            !gameState.isPowerOut ? 1.5 : 0.0,
-            !gameState.isPowerOut ? 1.5 : 0.0,
-            !gameState.isPowerOut ? 1.5 : 0.0,
-            // 下面是備用的燈，顏色設為 0, 0, 0 (完全不發光，就不會影響畫面)
-            // 燈 3：左門探照燈 (沒電就強制不亮)
-            (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, 
-            (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, 
-            (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, 
-            
-            // 燈 4：前門/窗探照燈 (沒電就強制不亮)
-            (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0, 
-            (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0, 
-            (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0,
-            0.8, 0.7, 0.5,  // 燈 8
-            1.5, 1.5, 1.5 ,  // 燈 9 DJ
-            (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0, // 燈 10 (備用燈)
-            (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0,
-            (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0
-            
-        ]);
-
-        // 把這兩大串陣列一口氣丟給顯示卡！(注意：要用 uniform3fv 而不是 uniform3f)
-        let u_LightPos = this.gl.getUniformLocation(this.program, 'u_LightPos');
-        let u_LightColor = this.gl.getUniformLocation(this.program, 'u_LightColor');
-        
-        this.gl.uniform3fv(u_LightPos, lightPositions);
-        this.gl.uniform3fv(u_LightColor, lightColors);
-
-        // --- 【核心新增】動態抓取當前模式下的攝影機世界座標 ---
-        let camX = 0, camY = 1.5, camZ = 12; // 預設值（警衛室位置）
+        let camX = 0, camY = 1.5, camZ = 12;
+        let projMatrix = new Matrix4();
+        let viewMatrix = new Matrix4();
+        projMatrix.setPerspective(60, this.canvas.width / this.canvas.height, 0.1, 300);
 
         if (gameState.obMode) {
-            // 1. OB 自由飛行模式
-            camX = gameState.obCam.x;
-            camY = gameState.obCam.y;
-            camZ = gameState.obCam.z;
+            camX = gameState.obCam.x; camY = gameState.obCam.y; camZ = gameState.obCam.z;
+            let pitchRad = gameState.obCam.pitch * Math.PI / 180; let yawRad = gameState.obCam.yaw * Math.PI / 180;
+            let fX = Math.sin(yawRad) * Math.cos(pitchRad); let fY = Math.sin(pitchRad); let fZ = -Math.cos(yawRad) * Math.cos(pitchRad);
+            viewMatrix.setLookAt(camX, camY, camZ, camX + fX, camY + fY, camZ + fZ, 0, 1, 0);
         } else if (gameState.isMonitorOpen && gameState.power > 0) {    
-            // 2. 監視器模式 (直接借用你下面 switch 裡面 setLookAt 的前三個參數)
             switch (gameState.currentCam) {
-                case 'cam1': camX = 8;  camY = 6;   camZ = -18; break;
-                case 'cam2': camX = 0;  camY = 6;   camZ = -6;  break;
-                case 'cam3': camX = -6; camY = 6;   camZ = -15; break;
-                case 'cam4': camX = 8;  camY = 4;   camZ = -4;  break;
-                case 'cam5': camX = 10; camY = 8;   camZ = -20; break;
-                case 'cam6': camX = -5; camY = 3;   camZ = 12;  break;
-                case 'cam7': camX = -8; camY = 4.5; camZ = 8;   break;
-                case 'cam8': camX = 27.5;camY = 2;  camZ = 14;  break;
+                case 'cam1': camX = 8;  camY = 6;   camZ = -18; viewMatrix.setLookAt(8, 6, -18,  0, 2, -30,  0, 1, 0); break;
+                case 'cam2': camX = 0;  camY = 6;   camZ = -6;  viewMatrix.setLookAt(0, 6, -6,   0, 1, -12,  0, 1, 0); break;
+                case 'cam3': camX = -6; camY = 6;   camZ = -15; viewMatrix.setLookAt(-6, 6, -15, -12, 3, -16,  0, 1, 0); break;
+                case 'cam4': camX = 8;  camY = 4;   camZ = -4;  viewMatrix.setLookAt(8, 4, -4,   10, 2, 2,   0, 1, 0); break;
+                case 'cam5': camX = 10; camY = 8;   camZ = -20; viewMatrix.setLookAt(10, 8, -20, 18, 2,-16,  0, 1, 0); break;
+                case 'cam6': camX = -5; camY = 3;   camZ = 12;  viewMatrix.setLookAt(-5, 3, 12 , -23, 2, 9,   0, 1, 0); break;
+                case 'cam7': camX = -8; camY = 4.5; camZ = 8;   viewMatrix.setLookAt(-8, 4.5, 8 ,-16, 1, 6,   0, 1, 0); break;
+                case 'cam8': camX = 27.5;camY = 2;  camZ = 14;  viewMatrix.setLookAt(27.5, 2, 14,24, 3, -8.5, 0, 1, 0); break;
             }
         } else {
-            // 3. 警衛模式
-            camX = 0; camY = 1.5; camZ = 12;
+            let radian = gameState.guardYaw * Math.PI / 180;
+            viewMatrix.setLookAt(camX, camY, camZ, camX - Math.sin(radian), camY, camZ - Math.cos(radian), 0, 1, 0);
         }
 
-        // 把攝影機座標、高光粗糙度、高光材質顏色傳給 Uniform
-        let u_EyePos = this.gl.getUniformLocation(this.program, 'u_EyePos');
-        let u_Shininess = this.gl.getUniformLocation(this.program, 'u_Shininess');
-        let u_MaterialSpecular = this.gl.getUniformLocation(this.program, 'u_MaterialSpecular');
-
-        this.gl.uniform3f(u_EyePos, camX, camY, camZ);
-        this.gl.uniform1f(u_Shininess, 32.0); // 數值 32.0 效果不錯，你可以調 64（更硬）或 16（更軟）
-        this.gl.uniform3f(u_MaterialSpecular, 1.0, 1.0, 1.0); // 純白高光點
-
-
-
-
-        // 1. 監視器打開中
-        // 2. 還在干擾時間內
-        // 3. 有電  
-        // 4. 目前看的這台攝影機，剛好包含在「壞掉名單(flickerCams)」裡面！
-        let isFlickering = gameState.isMonitorOpen && 
-                           gameState.flickerTimer > 0 && 
-                           gameState.power > 0 &&
-                           gameState.flickerCams.includes(gameState.currentCam);
-
+        let isFlickering = gameState.isMonitorOpen && gameState.flickerTimer > 0 && gameState.power > 0 && gameState.flickerCams.includes(gameState.currentCam);
         if (isFlickering) {
-            // 把背景塗成純黑色 (模擬斷訊)
-            this.gl.clearColor(0.0, 0.0, 0.0, 1.0); 
-            this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
-            
-            // 直接 return，不把地圖畫出來！
+            gl.clearColor(0.0, 0.0, 0.0, 1.0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
             return; 
         }
 
-
-
-        let projMatrix = new Matrix4();
-        let viewMatrix = new Matrix4();
-       // 請在 draw 函數裡找到這行並修改最後一個參數
-        projMatrix.setPerspective(60, this.canvas.width / this.canvas.height, 0.1, 300);    
-
-        // 切換 OB 模式與一般模式
-        if (gameState.obMode) {
-            // OB 模式：自由飛行攝影機 (利用三角函數計算看向的方向)
-            let pitchRad = gameState.obCam.pitch * Math.PI / 180;
-            let yawRad = gameState.obCam.yaw * Math.PI / 180;
-            
-            // 計算前方向量 Forward Vector (X, Y, Z)
-            let fX = Math.sin(yawRad) * Math.cos(pitchRad);
-            let fY = Math.sin(pitchRad);
-            let fZ = -Math.cos(yawRad) * Math.cos(pitchRad);
-
-            viewMatrix.setLookAt(
-                gameState.obCam.x, gameState.obCam.y, gameState.obCam.z,
-                gameState.obCam.x + fX, gameState.obCam.y + fY, gameState.obCam.z + fZ,
-                0, 1, 0
-            );
-        } else if (gameState.isMonitorOpen && gameState.power > 0) {    
-            // 監視器模式：根據選擇的鏡頭，把攝影機掛在天花板角落往下看
-            switch (gameState.currentCam) {
-                case 'cam1': // 主舞台 (從右前方往左下看舞台)
-                    viewMatrix.setLookAt(8, 6, -18,  0, 2, -30,  0, 1, 0);
-                    break;
-                case 'cam2': // 用餐區 (從後面往前面長桌看)
-                    viewMatrix.setLookAt(0, 6, -6,  0, 1, -12,  0, 1, 0);
-                    break;
-                case 'cam3': // 海盜灣 (由上往下特寫)
-                    viewMatrix.setLookAt(-6, 6, -15,  -12, 3, -16,  0, 1, 0);
-                    break;
-                case 'cam4': // 右側走廊通風管
-                    viewMatrix.setLookAt(8, 4, -4,  10, 2, 2,  0, 1, 0);
-                    break;
-                case 'cam5': // DJ台
-                    viewMatrix.setLookAt(10, 8, -20,  18, 2,-16,  0, 1, 0);
-                break;
-                case 'cam6': // 左邊走廊
-                    viewMatrix.setLookAt(-5, 3, 12 ,  -23, 2, 9,  0, 1, 0);
-                break;
-                case 'cam7': // 左邊小防間
-                    viewMatrix.setLookAt(-8, 4.5, 8 ,  -16, 1, 6,  0, 1, 0);
-                break;
-                case 'cam8': // 通風管道
-                    viewMatrix.setLookAt(27.5, 2, 14,  24, 3, -8.5,  0, 1, 0);
-                break;
-            }
-        } else {
-            // 👮 警衛模式 (坐在椅子上)
-            let eyeX = 0, eyeY = 1.5, eyeZ = 12; // 警衛的座標 (你地圖 Z=12 的位置)
-            
-            // 將大腦算好的角度 (Degree) 轉換為弧度 (Radian)
-            let radian = gameState.guardYaw * Math.PI / 180;
-            
-            // 利用三角函數計算出目光的落點 (目標點 X 與 Z)
-            // 因為我們預設是看向 Z 軸負方向，所以 Z 是用 -cos，X 是用 -sin
-            let targetX = eyeX - Math.sin(radian);
-            let targetZ = eyeZ - Math.cos(radian);
-
-            // 設定攝影機
-            viewMatrix.setLookAt(
-                eyeX, eyeY, eyeZ,        // 眼睛位置
-                targetX, eyeY, targetZ,  // 看向的目標點
-                0, 1, 0                  // 頭頂朝上
-            );
-        }
-
-
-        // --- 【核心新增】繪製天空盒背景 ---
-        // 這裡的 camX, camY, camZ 就是我們剛剛在第一步為了高光撈出來的攝影機位置！
         this.drawSkybox(projMatrix, viewMatrix, camX, camY, camZ);
 
-        // 記得切換回原本的主程式 Shader，因為下面的物體要用原本的 Shader 畫
-        this.gl.useProgram(this.program);
-
-        // --- 開始捏地圖 (Blockout) ---
-
-        // 使用 drawBlock(proj, view, X, Y, Z, 縮放X, 縮放Y, 縮放Z, 顏色R, 顏色G, 顏色B)
-      
-        // 警衛室 (Security Office) Blockout
-
-
-        // 1. 警衛室地板 (灰色)
-        this.drawBlock(projMatrix, viewMatrix, 0, 0, 11,  4, 0.1, 3,  0.3, 0.3, 0.3);
-
-        // 2. 你的辦公桌 (深棕色) - 放在你面前 Z=11 的位置
-        this.drawBlock(projMatrix, viewMatrix, 0, 1, 10,  1.5, 0.1, 0.5,  0.4, 0.2, 0.1);
-        this.drawBlock(projMatrix, viewMatrix, -1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 左桌腳
-        this.drawBlock(projMatrix, viewMatrix,  1.2, 0.5, 10,  0.1, 0.5, 0.4,  0.4, 0.2, 0.1); // 右桌腳
-
-        this.drawSphere(projMatrix, viewMatrix, -1.0, 1.2, 11.0,  0.15, 0.15, 0.15,  1.0, 1.0, 1.0);
-        //this.drawBlock(projMatrix, viewMatrix,  -1.0, 0.6, 15.0,  0.15, 0.075 , 0.15,  0.4, 0.2, 0.1);
-        // 3. 正前方牆壁 (包含 Window 和 Door 1) - Z=9
-        // 窗戶左邊的牆
-        this.drawBlock(projMatrix, viewMatrix, -3.0, 2.5, 8,  0.75, 2.5, 0.2,  0.2, 0.3, 0.3); 
-        // 窗戶下方的牆 (窗台，這樣上面就空出來變成窗戶了)
-        this.drawBlock(projMatrix, viewMatrix, -1.5, 0.8, 8,  1.5, 0.8, 0.2,  0.2, 0.3, 0.3); 
-        // 窗戶上方的牆 (窗台，這樣上面就空出來變成窗戶了)
-        this.drawBlock(projMatrix, viewMatrix, -1.5, 4.2, 8,  1.5, 0.8, 0.2,  0.2, 0.3, 0.3); 
-        // 窗戶與 Door 1 中間的柱子
-        this.drawBlock(projMatrix, viewMatrix, 0.5, 2.5, 8,  0.5, 2.5, 0.2,  0.2, 0.3, 0.3); 
-        // Door 1 的門樑 (門洞上方)
-        this.drawBlock(projMatrix, viewMatrix, 2, 4, 8,  1, 1, 0.2,  0.2, 0.3, 0.3); 
-        // Door 1 右邊的牆
-        this.drawBlock(projMatrix, viewMatrix, 3.5, 2.5, 8,  0.5, 2.5, 0.2,  0.2, 0.3, 0.3); 
-
-        this.drawBlock(projMatrix, viewMatrix, 2, gameState.rightDoorY, 8, 1.25 ,2 , 0.15,  0.2, 0.25, 0.3);
-
-        // 4. 左邊牆壁 (包含 Door 2) - X=-4
-        // 門前方的牆
-        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 9,  0.2, 2.5, 1,  0.2, 0.3, 0.3);
-        // 門後方的牆
-        this.drawBlock(projMatrix, viewMatrix, -4, 2.5, 13.0, 0.2, 2.5, 1.0, 0.2, 0.3, 0.3);
-        // Door 2 的門樑
-        this.drawBlock(projMatrix, viewMatrix, -4, 4, 11.25,  0.2, 1, 1.3, 0.2, 0.3, 0.3);
-
+        gl.useProgram(this.program);
+        this.setupLights(gameState);
+        gl.uniform3f(gl.getUniformLocation(this.program, 'u_EyePos'), camX, camY, camZ);
         
-        // 繪製左邊的金屬防護門 (會上下滑動)
-       
-       
-        
-        this.drawBlock(projMatrix, viewMatrix, -4, gameState.leftDoorY, 11.25,  0.15, 1.5, 1.1,  0.2, 0.25, 0.3);
+        // 🟢【重要 Uniform】傳入光的 MVP 矩陣與剛剛畫好的 Shadow Map 紋理給主要 Shader
+        gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_LightMvpMatrix'), false, lightMvpMatrix.elements);
+        gl.activeTexture(gl.TEXTURE3);
+        gl.bindTexture(gl.TEXTURE_2D, this.shadowDepthTexture);
+        gl.uniform1i(gl.getUniformLocation(this.program, 'u_ShadowMap'), 3); // 綁定在單元 3
 
-        // 5. 右邊牆壁 (包含 Vent 通風管) - X=4
-        this.drawBlock(projMatrix, viewMatrix, 4, 2.5, 11,  0.2, 2.5, 3,  0.2, 0.3, 0.3); // 右邊主牆
-        // 用一個黑色的深色方塊假裝是通風管的開口 (Z=13 稍微靠後)
-        this.drawBlock(projMatrix, viewMatrix, 3.8, 1.0, 12,  0.3, 1, 1,  0.05, 0.05, 0.05); 
+        // 正常畫出整個世界
+        this.drawScene(projMatrix, viewMatrix, gameState);
+        // 畫出水晶球
+        this.drawSphere(projMatrix, viewMatrix, -0.6, 1.3, 10.0,  0.15, 0.15, 0.15,  1.0, 1.0, 1.0);
+    },
 
-        // 6. 警衛室背後的牆壁 - Z=15
-        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 14,  4, 2.5, 0.2,  0.2, 0.3, 0.3);
-
-        
-        // 主地圖 (根據草圖建立
-
-        // --- 1. 全區大地板 ---
-        // 從警衛室前方一直延伸到舞台的深灰色大地板
-        this.drawBlock(projMatrix, viewMatrix, 0, -0.05, -10,  25, 0.1, 25 ,  0.2, 0.2, 0.25);
-        this.drawBlock(projMatrix, viewMatrix, 30, -0.05, -10,  15, 0.1, 25 ,  0.2, 0.2, 0.25); // 右邊延伸出去的地板
-        this.drawBlock(projMatrix, viewMatrix, 0, -0.05, 30,  25, 0.1, 25 ,  0.2, 0.2, 0.25);
-
-        // --- 2. 外部圍牆 (地圖的最外緣，暗紅色) ---
-        // 北邊牆壁 (舞台後方)
-        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, -35,  25, 2.5, 0.5,   0.5, 0.15, 0.15);
-        // 西邊牆壁 (海盜灣與左走廊的外牆)
-        this.drawBlock(projMatrix, viewMatrix, -25, 2.5, -10,  0.5, 2.5, 25,  0.5, 0.15, 0.15);
-        // 東邊牆壁 (右側房間的外牆)
-        this.drawBlock(projMatrix, viewMatrix, 25, 2.5, -10,  0.5, 2.5, 25,  0.5, 0.15, 0.15);
-        // 南邊牆壁 (警衛室前方的牆壁，連接左右兩側牆壁)
-        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, 15,  25, 2.5, 0.5,   0.5, 0.15, 0.15);
-
-        // --- 3. 主要用餐區 (Dining Area) ---
-        // 你的 4 張長桌 (棕色)
-        this.drawBlock(projMatrix, viewMatrix, -7.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-
-        this.drawBlock(projMatrix, viewMatrix, -3.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-
-        this.drawBlock(projMatrix, viewMatrix, 3.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-        
-        this.drawBlock(projMatrix, viewMatrix, 7.5, 1, -22,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-
-        this.drawBlock(projMatrix, viewMatrix, -7.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-
-        this.drawBlock(projMatrix, viewMatrix, -3.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-
-        this.drawBlock(projMatrix, viewMatrix, 3.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-        
-        this.drawBlock(projMatrix, viewMatrix, 7.5, 1, -10,  0.8, 0.1, 5,   0.4, 0.2, 0.1); // 最左桌
-        
-        //DJ Table 
-
-        this.drawBlock(projMatrix, viewMatrix, 18, 2, -16,  2.0 , 0.1, 5,   1, 0.5, 1); // DJ桌
-        this.drawBlock(projMatrix, viewMatrix, 18, 1, -16,  1 , 1, 1,    1, 0.5, 1);
-
-
-        // --- 4. 主舞台 (Stage) ---
-        // 舞台底座 (稍高一點的木板)
-        this.drawBlock(projMatrix, viewMatrix, 0, 0.5, -32,  10, 0.5, 2.5,   0.3, 0.2, 0.1);
-        // 舞台背板/布幕 (深色)
-        this.drawBlock(projMatrix, viewMatrix, 0, 3, -34.5,  8.5, 4, 0.2,   0.1, 0.1, 0.1);
-
-        // --- 5.  海盜灣 (Pirate Cove - 左上角) ---
-        // 舞台底座 (現在是真的圓形了！半徑由 sx 和 sz 決定)
-        this.drawCylinder(projMatrix, viewMatrix, -18, 0.5, -18,  3.0, 0.5, 3.0,  0.2, 0.1, 0.3);
-        
-        // 舞台布幕 
-        this.drawBlock(projMatrix, viewMatrix, -18, 2, -21,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
-        this.drawBlock(projMatrix, viewMatrix, -21.5, 2, -18,  0.2, 2.5, 3.5,   0.3, 0.1, 0.4);
-        this.drawBlock(projMatrix, viewMatrix, -18, 2, -15,  3.5, 2.5, 0.2,   0.3, 0.1, 0.4);
-
-        // --- 6. 連接走廊 (Corridors) ---
-
-        // 區隔用餐區與警衛室走廊的南邊牆壁 (Z = -2)
-        this.drawBlock(projMatrix, viewMatrix, -11, 2.5, 2,  8, 2.5, 0.2,  0.5, 0.15, 0.15); // 左半邊牆
-        this.drawBlock(projMatrix, viewMatrix,  14, 2.5, 2,  11, 2.5, 0.2,  0.5, 0.15, 0.15); // 右半邊牆
-        this.drawBlock(projMatrix, viewMatrix, 0, 2.5, -4.5,  10, 2.5, 0.2,  0.5, 0.15, 0.15); // 中間牆
-        
-        // 正前方走廊 (連接 Door 1 到用餐區)
-        this.drawBlock(projMatrix, viewMatrix, -3.2, 2.5, 5,  0.2, 2.5, 3,   0.5, 0.15, 0.15); // 左側牆壁
-        this.drawBlock(projMatrix, viewMatrix,  3.2, 2.5, 5,  0.2, 2.5, 3,   0.5, 0.15, 0.15); // 右側牆壁
-
-        // 左側走廊 (連接 Door 2 到左邊盡頭)
-        this.drawBlock(projMatrix, viewMatrix, -11, 2.5, 9, 7, 2.5, 0.2,  0.5, 0.15, 0.15); // 南側牆 (防穿幫)
-
-        // 左側走廊 房間
-        this.drawBlock(projMatrix, viewMatrix, -5.5, 2.5, 5.5,  0.2, 2.5, 3.5,   0.5, 0.15, 0.15); // 房底牆壁
-        this.drawBlock(projMatrix, viewMatrix, -17.8, 2.5, 7.5,  0.2, 2.5, 1.5,   0.5, 0.15, 0.15); // 左側牆壁
-        this.drawBlock(projMatrix, viewMatrix, -17.8, 2.5, 2.8,  0.2, 2.5, 0.75,   0.5, 0.15, 0.15); // 左側牆壁
-
-        // 左側走廊 房間
-        this.drawBlock(projMatrix, viewMatrix,  14, 2.5, 2,  11, 2.5, 0.2,  0.5, 0.15, 0.15); // 右半邊牆
-        //通風管
-        this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 10,  11, 1.5, 0.2, 0.3, 0.3, 0.3); 
-        this.drawBlock(projMatrix, viewMatrix,  15, 3, 11.5,  11, 0.2 , 1.5 , 0.3, 0.3, 0.3); //橫的
-        this.drawBlock(projMatrix, viewMatrix,  15, 1.5, 13,  11, 1.5, 0.2, 0.3, 0.3, 0.3);
-
-        this.drawBlock(projMatrix, viewMatrix,  25, 1.5, -14,  2, 1.5, 0.2, 0.3, 0.3, 0.3); 
-        this.drawBlock(projMatrix, viewMatrix,  25, 3, -12.5,  2, 0.2 , 1.5 , 0.3, 0.3, 0.3); //橫的
-        this.drawBlock(projMatrix, viewMatrix,  25, 1.5, -11,  2, 1.5, 0.2, 0.3, 0.3, 0.3);
-        this.drawBlock(projMatrix, viewMatrix, 24, 1.5, -12.5,  0.1, 1.3 , 1.3 , 0, 0, 0); 
-
-        this.drawBlock(projMatrix, viewMatrix, 26, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
-        this.drawBlock(projMatrix, viewMatrix, 27.5, 3, -10,  1.5, 0.2 , 25 , 0.3, 0.3, 0.3); 
-        this.drawBlock(projMatrix, viewMatrix, 29, 1.5, -10,  0.2, 1.25, 25,  0.3, 0.3, 0.3);
-
-        this.drawBlock(projMatrix, viewMatrix, 11, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
-        this.drawBlock(projMatrix, viewMatrix, 12.5, 3, 5.5,  1.5, 0.2 , 4.5 , 0.3, 0.3, 0.3); 
-        this.drawBlock(projMatrix, viewMatrix, 14, 1.5, 5.5,  0.2, 1.25, 4.5,  0.3, 0.3, 0.3);
-        this.drawBlock(projMatrix, viewMatrix, 12.5, 1.5, 1,  1.3, 1.3 , 0.1 , 0, 0, 0); 
-
-
-        // 辦公室電風扇 (極簡旋轉版)
-   
-        let fX = 0.8, fY = 1.1, fZ = 10.1; 
-
-        // 1. 底盤與支柱 (靜態)
-        this.drawCylinder(projMatrix, viewMatrix, fX, fY, fZ, 0.15, 0.02, 0.15, 0.2, 0.2, 0.2);
-        this.drawCylinder(projMatrix, viewMatrix, fX, fY + 0.1, fZ, 0.02, 0.1, 0.02, 0.2, 0.2, 0.2);
-
-        // 2. 馬達頭 (靜態)
-        this.drawBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ, 0.08, 0.08, 0.1, 0.2, 0.2, 0.2);
-
-        // 3. 會旋轉的十字葉片！(使用新的 drawRotatedBlock，並傳入 gameState.fanAngle)
-        
-        // 垂直葉片 ( | 形狀 )
-        this.drawRotatedBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ + 0.11, 0.02, 0.15, 0.01, gameState.fanAngle, 0.05, 0.05, 0.05);
-        
-        // 水平葉片 ( - 形狀 )
-        this.drawRotatedBlock(projMatrix, viewMatrix, fX, fY + 0.2, fZ + 0.11, 0.15, 0.02, 0.01, gameState.fanAngle, 0.05, 0.05, 0.05);
-
-
-
-
-  
-        // 繪製怪物 (Bonnie) - 真實 3D 空間實體版
-    
-        let bLoc = gameState.bonnie.location;
-        
-        if (Renderer.models && Renderer.models.bonnieNormal) {
-            let bLoc = gameState.bonnie.location;
-            //let bLoc = 'jumpscare';
-            let currentBonnie = Renderer.models.bonnieNormal; // 預設使用普通站姿
-            
-            // 設定 Bonnie 在一般場景裡的大小 (請依據你的模型實際大小微調，這裡先預設跟 Freddy 一樣 1.8)
-            let bScale = 0.04; 
-
-            if (bLoc === 'cam1') {
-                // 在舞台上 
-                // 參數：投影, 視角, X, Y, Z, 縮放X, 縮放Y, 縮放Z, 旋轉Y角, 模型檔案
-                currentBonnie = Renderer.models.bonnieNormal;
-                this.drawCharacter(projMatrix, viewMatrix, -4, 1, -32, bScale, bScale, bScale, 0, currentBonnie); 
-            } 
-            else if (bLoc === 'cam2') {
-                // 在用餐區長桌旁 
-                currentBonnie = Renderer.models.bonnieCam2;
-                this.drawCharacter(projMatrix, viewMatrix, 0, 1, -11, bScale, bScale, bScale, -30, currentBonnie); 
-            } 
-            else if (bLoc === 'cam4') {
-                
-                this.drawCharacter(projMatrix, viewMatrix, 8, 1, 2, bScale, bScale, bScale, -45, currentBonnie); 
-            }
-            else if (bLoc === 'cam6') {
-                
-                currentBonnie = Renderer.models.bonnieCam6;
-                this.drawCharacter(projMatrix, viewMatrix, -18, 0, 13, bScale, bScale, bScale, 90, currentBonnie); 
-            } 
-            else if (bLoc === 'cam7') {
-                
-                currentBonnie = Renderer.models.bonnieCam7;
-                this.drawCharacter(projMatrix, viewMatrix, -11, 0, 7.8, bScale, bScale, bScale, 145, currentBonnie); 
-            }  
-            else if (bLoc === 'door') {
-                if (gameState.leftLightOn) {
-                    // 畫在左邊門口的窗外，旋轉 90 度讓她面向辦公室裡面
-                    // 這裡的縮放設定為 0.6，配合門口的大小
-                    this.drawCharacter(projMatrix, viewMatrix, -5.5, 0, 11, 0.03, 0.03, 0.03, 90, currentBonnie); 
-                }
-            } 
-            else if (bLoc === 'jumpscare') {
-
-                // 利用原本的三角函數做出瘋狂抖動的效果
-                currentBonnie = Renderer.models.bonnieAttack;
-                let shakeX = Math.sin(gameState.time * 50) * 0.1;
-                let shakeY = Math.cos(gameState.time * 70) * 0.1;
-        
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -1 + shakeY, 11, 0.03, 0.03, 0.03, 0, currentBonnie); 
+    // 抽離出來的燈光設定工具函數
+    setupLights: function(gameState) {
+        let gl = this.gl;
+        let officeR = 1.6, officeG = 1.4, officeB = 1.0;
+        if (gameState.isPowerOut) {
+            if (gameState.powerOutPhase === 1) {
+                let flicker = (Math.random() > 0.5) ? 0.15 : 0.02;
+                officeR = flicker; officeG = flicker; officeB = flicker;
+            } else if (gameState.powerOutPhase === 2){
+                officeR = 0.3; officeG = 0.3; officeB = 0.3;
+            } else if (gameState.powerOutPhase === 3){
+                officeR = 1.0; officeG = 1.0; officeB = 1.0;
             }
         }
-
-        
-        
-
-        if (Renderer.models && Renderer.models.freddyNormal) {
-            let loc = gameState.freddy.location;
-
-            //let loc = 'jumpscare';
-            let fScale = 1.8;
-            // 決定要用哪一個模型！
-            let currentModel = Renderer.models.freddyNormal; 
-            
-            if (loc === 'cam1') {
-                // 畫在舞台上
-    
-                currentModel = Renderer.models.freddyNormal;
-                this.drawCharacter(projMatrix, viewMatrix, 3, 1, -32, fScale, fScale, fScale, 0, currentModel); 
-            }else if(loc === 'cam2'){
-                currentModel = Renderer.models.freddyNormal;
-                this.drawCharacter(projMatrix, viewMatrix, 10, 0, -18, fScale, fScale, fScale, 55, currentModel); 
-            }else if(loc === 'cam5'){
-                currentModel = Renderer.models.freddyDown;
-                this.drawCharacter(projMatrix, viewMatrix, 21, 0, -10, fScale, fScale, fScale, 135, currentModel); 
-            }else if(loc === 'cam8'){
-                currentModel = Renderer.models.freddyVent;
-                this.drawCharacter(projMatrix, viewMatrix, 27.5, 0, 6, 1.4, 1.4, 1.4, 0, currentModel); 
-            }else if(loc === 'cam4'){
-                currentModel = Renderer.models.freddyOut;
-                this.drawCharacter(projMatrix, viewMatrix, 7, 0, 0, fScale, fScale, fScale, 180, currentModel); 
-            }else if (loc === 'door') {
-                currentModel = Renderer.models.freddyAttack;
-                if(gameState.powerOutPhase === 1){
-                    this.drawCharacter(projMatrix, viewMatrix, -0.5, 0, 5, fScale, fScale, fScale, 0, currentModel);
-                }
-            }else if (loc === 'jumpscare') {
-                currentModel = Renderer.models.freddyAttack;
-                
-            
-                let shakeX = Math.sin(gameState.time * 50) * 0.1;
-                let shakeY = Math.cos(gameState.time * 70) * 0.1;
-                
-               
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, fScale, fScale,fScale, 0, currentModel); 
-            }
-        }
-
-        if (Renderer.models && Renderer.models.chicaNormal) {
-            let loc = gameState.chica.location;
-
-            //let loc = 'cam4';
-            let CScale = 0.045;
-            // 決定要用哪一個模型
-            let currentModel = Renderer.models.chicaNormal; 
-            
-            if (loc === 'cam1') {
-                currentModel = Renderer.models.chicaNormal;
-                this.drawCharacter(projMatrix, viewMatrix, 0, 1, -32, CScale, CScale, CScale, 0, currentModel); 
-            }else if(loc === 'cam2'){
-                currentModel = Renderer.models.chicaCam2;
-                this.drawCharacter(projMatrix, viewMatrix, -2, 0, -9, CScale, CScale, CScale, 90, currentModel); 
-                
-            }else if(loc === 'cam4'){
-                currentModel = Renderer.models.chicaCam4;
-                this.drawCharacter(projMatrix, viewMatrix, 9, 0, -3, CScale, CScale, CScale, 200 , currentModel); 
-                
-            }else if (loc === 'door' && gameState.rightLightOn) {
-                currentModel = Renderer.models.chicaNormal;
-
-                if (gameState.rightLightOn) {
-
-                    this.drawCharacter(projMatrix, viewMatrix, -0.5, 0, 5, CScale, CScale, CScale, 0, currentModel); 
-                }
-            }else if (loc === 'jumpscare') {
-                currentModel = Renderer.models.chicaAttack;
-                
-            
-                let shakeX = Math.sin(gameState.time * 50) * 0.1;
-                let shakeY = Math.cos(gameState.time * 70) * 0.1;
-                
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 10, CScale, CScale, CScale, 0, currentModel); 
-            }
-        }
-
-        if (Renderer.models && Renderer.models.foxyNormal) {
-            let loc = gameState.foxy.location;
-
-            //let loc = 'jumpscare';
-            let foxyScale = 0.2;
-         
-            let currentModel = Renderer.models.foxyNormal; 
-            
-            if (loc === 'cam3') {
-                if(GameState.foxy.phase === 0){
-                    currentModel = Renderer.models.foxyNormal;
-                }else if(GameState.foxy.phase === 1){
-                    currentModel = Renderer.models.foxyP1;
-                }else if(GameState.foxy.phase === 2){
-                    currentModel = Renderer.models.foxyP2;
-                }else if(GameState.foxy.phase === 3){
-                    currentModel = Renderer.models.foxyP3;
-                }
-                this.drawCharacter(projMatrix, viewMatrix, -18, 1, -18, foxyScale, foxyScale, foxyScale, 90, currentModel); 
-            }else if (loc === 'cam6') {
-                //每 150 毫秒切換一次左右腳！
-                let isLeftFoot = Math.floor(Date.now() / 150) % 2 === 0; 
-                
-                // 根據上面的計算，決定現在要畫哪一個模型
-                let currentModel = isLeftFoot ? Renderer.models.foxyL : Renderer.models.foxyR;
-
-                //2. 衝刺位移：計算 Foxy 目前在走廊的深度 (Z 軸)
-                let startx = -18;
-                let endx = -2; 
-                
-                // 讀取大腦裡的「奔跑進度 (0.0 ~ 1.0)」，算出現在真正的 Z 座標
-                // (如果沒讀到，預設給 0，避免報錯)
-                let currentX = startx + (endx - startx) * (gameState.foxy.runProgress || 0);
-
-                // 畫出狂奔的 Foxy
-                if (currentModel) {
-                    this.drawCharacter(projMatrix, viewMatrix, currentX, 0, 11, foxyScale, foxyScale, foxyScale, 90, currentModel);
-                }
-            }else if (loc === 'jumpscare') {
-                currentModel = Renderer.models.foxyNormal;
-                
-            
-                let shakeX = Math.sin(gameState.time * 50) * 0.1;
-                let shakeY = Math.cos(gameState.time * 70) * 0.1;
-                
-             
-                this.drawCharacter(projMatrix, viewMatrix, shakeX, -2 + shakeY, 11, foxyScale, foxyScale, foxyScale, 0, currentModel); 
-            }
-        }
-
+        let lightPositions = new Float32Array([
+            0.0, 4.5, 10.0,  0.0, 6, -32.0,  -18.0, 3.5, -18.0, -23, 2, 9,  10, 4, 2,  0, 1, -12,
+            -5.0, 4, 11.25,  0.0, 4, 6.0,  -16, 1, 6,  18, 2,-16,  -1.5, 2, 9
+        ]);
+        let lightColors = new Float32Array([
+            officeR, officeG, officeB,  1.6, 1.6, 2.4,  1.0, 0.1, 0.1,
+            !gameState.isPowerOut ? 0.7 : 0.0, !gameState.isPowerOut ? 0.7 : 0.0, !gameState.isPowerOut ? 0.7 : 0.0,
+            !gameState.isPowerOut ? 0.7 : 0.0, !gameState.isPowerOut ? 0.7 : 0.0, !gameState.isPowerOut ? 0.7 : 0.0,
+            !gameState.isPowerOut ? 1.5 : 0.0, !gameState.isPowerOut ? 1.5 : 0.0, !gameState.isPowerOut ? 1.5 : 0.0,
+            (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, (!gameState.isPowerOut && gameState.leftLightOn) ? 1.5 : 0.0, 
+            (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0, (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0, (!gameState.isPowerOut && gameState.rightLightOn) ? 1.5 : 0.0,
+            0.8, 0.7, 0.5,  1.5, 1.5, 1.5,
+            (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0, (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0, (gameState.isPowerOut && gameState.powerOutPhase === 1) ? 1.0 : 0.0
+        ]);
+        gl.uniform3fv(gl.getUniformLocation(this.program, 'u_LightPos'), lightPositions);
+        gl.uniform3fv(gl.getUniformLocation(this.program, 'u_LightColor'), lightColors);
+        gl.uniform1f(gl.getUniformLocation(this.program, 'u_Shininess'), 32.0); 
+        gl.uniform3f(gl.getUniformLocation(this.program, 'u_MaterialSpecular'), 1.0, 1.0, 1.0);
     },
 
 
