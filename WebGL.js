@@ -867,14 +867,14 @@ draw: function(gameState) {
         let gl = this.gl;
 
         // 右門探照燈的世界座標 (從你的燈 7 陣列中提取)
-        let lX = 0.0, lY = 4.0, lZ = 6.0; 
+        let lX = 1.0, lY = 4.0, lZ = 6.0; 
 
         let shadowProj = new Matrix4();
         let shadowView = new Matrix4();
         // 探照燈具有方向性，利用 perspective 模擬聚光燈圓錐，視野設為 90 度，遠景 50 即可
         shadowProj.setPerspective(90, 1.0, 0.1, 50);
         // 讓探照燈精準看向右側牆壁門口的方向（朝 X 軸正方向、Z 軸稍靠後看過去）
-        shadowView.setLookAt(lX, lY, lZ,  4.0, 1.5, 10.0,  0, 1, 0);
+        shadowView.setLookAt(lX, lY, lZ,  -1.5, 2.0, 5.0,  0, 1, 0);
 
         let lightMvpMatrix = new Matrix4(); 
         // 這是光源專用的 MVP 基礎（此處不包含 Model，在物體繪製時會各自 multiply）
