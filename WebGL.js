@@ -205,8 +205,8 @@ const Renderer = {
         // 注意：這裡使用 DEPTH_COMPONENT 讓 WebGL 專門用來存高精度深度值
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.DEPTH_COMPONENT16, this.shadowMapSize, this.shadowMapSize, 0, gl.DEPTH_COMPONENT, gl.UNSIGNED_SHORT, null);
         
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
@@ -816,6 +816,18 @@ const Renderer = {
         normalMatrix.setInverseOf(modelMatrix).transpose();
 
         let gl = this.gl;
+        if (this.isDrawingShadow) {
+            gl.useProgram(this.shadowProgram);
+            gl.uniformMatrix4fv(gl.getUniformLocation(this.shadowProgram, 'u_MvpMatrix'), false, mvpMatrix.elements);
+            
+            let a_Position = gl.getAttribLocation(this.shadowProgram, 'a_Position');
+            for (let i = 0; i < components.length; i++) {
+                let comp = components[i];
+                this.initAttributeVariable(a_Position, comp.vertexBuffer);
+                gl.drawArrays(gl.TRIANGLES, 0, comp.numVertices);
+            }
+            return; 
+        }
         gl.useProgram(this.program);
         gl.uniform1f(gl.getUniformLocation(this.program, 'u_EnvReflectWeight'), 0.0);
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_MvpMatrix'), false, mvpMatrix.elements);
@@ -864,7 +876,7 @@ draw: function(gameState) {
         // 讓探照燈精準看向右側牆壁門口的方向（朝 X 軸正方向、Z 軸稍靠後看過去）
         shadowView.setLookAt(lX, lY, lZ,  4.0, 1.5, 10.0,  0, 1, 0);
 
-        let lightMvpMatrix = new Matrix4();
+        let lightMvpMatrix = new Matrix4(); 
         // 這是光源專用的 MVP 基礎（此處不包含 Model，在物體繪製時會各自 multiply）
         lightMvpMatrix.set(shadowProj).multiply(shadowView);
 
