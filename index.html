@@ -60,7 +60,28 @@
                 <button class="btn menu-btn" data-night="4" style="position:relative;">Night 4</button>
                 <button class="btn menu-btn" data-night="5" style="position:relative;">Night 5</button>
             </div>
-            <button id="btn-open-custom" class="btn" style="position:relative; margin-top: 20px; border-color: red; color: red;">Custom Night (7/20)</button>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button id="btn-open-tutorial" class="btn" style="position:relative; border-color: #0ff; color: #0ff;">How to Play</button>
+                <button id="btn-open-custom" class="btn" style="position:relative; border-color: red; color: red;">Custom Night</button>
+            </div>
+        </div>
+
+        <div id="tutorial-panel" style="display: none; margin-top: 20px; text-align: left; background: rgba(0,20,20,0.85); padding: 30px; border: 2px solid #0ff; border-radius: 15px; max-width: 600px; color: #ddd; line-height: 1.6;">
+            <h2 style="color: #0ff; margin-top: 0; text-align: center;">HOW TO PLAY</h2>
+            <p><b>[ Objective ]</b><br>Survive the night from 12 AM to 6 AM without being caught by the animatronics.</p>
+            <p><b>[ Controls ]</b><br>
+               • <b>Mouse:</b> Look around the office.<br>
+               • <b>UI Buttons:</b> Toggle doors, lights, and the camera monitor.<br>
+               • <b>[ O ] Key:</b> Toggle Free Camera (OB Mode). Hold Left Mouse Button to look around, use W/A/S/D/Space/Shift to fly.
+            </p>
+            <p><b>[ Mechanics ]</b><br>
+               • Using doors, lights, and the monitor consumes <b>Power</b>.<br>
+               • If Power reaches 0%, the lights go out, doors open, and Freddy will come for you.<br>
+               • Use the monitor to track animatronic movements and close the doors only when necessary!
+            </p>
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="btn-close-tutorial" class="btn" style="position:relative; font-size: 20px; border-color: #0ff; color: #0ff;">GOT IT</button>
+            </div>
         </div>
 
         <div id="custom-night-panel" style="display: none; margin-top: 30px; text-align: center; background: rgba(20,0,0,0.8); padding: 20px; border: 2px solid red; border-radius: 15px;">

@@ -1,6 +1,6 @@
 
 const NIGHT_DATA = {
-  1: { bonnie: 2, chica: 2, freddy: 0, foxy: 0 }, // 第一夜最簡單 (AI 皆為 0 不會動)
+  1: { bonnie: 2, chica: 2, freddy: 0, foxy: 0 }, 
   2: { bonnie: 5, chica: 2, freddy: 0, foxy: 0 },
   3: { bonnie: 7, chica: 5, freddy: 0, foxy: 3 },
   4: { bonnie: 8, chica: 7, freddy: 2, foxy: 5 },
@@ -12,6 +12,7 @@ let currentSelectedNight = 1; // 紀錄目前玩的是第幾夜
 
 
 const GameState = {
+    isPaused: false,
     time: 0,
     obMode: false, // 預設開啟 OB 模式，按 'O' 鍵可以切換
     fanAngle:0,
@@ -99,14 +100,22 @@ function returnToMenu() {
   GameState.gameStarted = false; // 確保遊戲迴圈停止運作
 
   // 4. 畫面大切換：隱藏遊戲 UI，重新顯示封面與主選單
-  document.getElementById('ui-layer').style.display = 'none';
-  document.getElementById('start-screen').style.display = 'flex';
-  document.getElementById('main-menu').style.display = 'flex';
-  document.getElementById('custom-night-panel').style.display = 'none'; // 確保自訂面板關起來
+    document.getElementById('ui-layer').style.display = 'none';
+    document.getElementById('start-screen').style.display = 'flex';
+    document.getElementById('main-menu').style.display = 'flex';
+    document.getElementById('custom-night-panel').style.display = 'none'; 
+    
+    // 🌟 新增這一行：確保教學面板也是關起來的
+    let tutorialPanel = document.getElementById('tutorial-panel');
+    if (tutorialPanel) tutorialPanel.style.display = 'none'; 
 
-  console.log("已回到主選單！");
+    console.log("🏠 已回到主選單！");
+
+  
 }
-
+// ==========================================
+// 🔄 秒速重新開始遊戲 (Soft Reset)
+// ==========================================
 function resetGame() {
   // 1. 移除 Game Over 或勝利的遮罩層
   let gameOverOverlay = document.getElementById('game-over-overlay');
@@ -117,8 +126,7 @@ function resetGame() {
 
   // 2. 停止所有聲音，重新啟動風扇聲
   AudioManager.stop('Fan');
-
-
+  
   // 3. 大腦狀態大洗牌 (時光倒流)
   GameState.timeElapsed = 0;
   GameState.gameEnd = false;
@@ -127,6 +135,7 @@ function resetGame() {
   GameState.usage = 1;
   powertimer = GameState.powerlosttime; // 重置扣電計時器
   GameState.gameStarted = false; // 等待 resetGame 完成後再啟動遊戲迴圈
+  
   // 4. 重置停電與跳殺狀態
   GameState.isPowerOut = false;
   GameState.powerOutPhase = 0;
@@ -154,31 +163,39 @@ function resetGame() {
   // 8. 怪物全部遣返回老家
   GameState.bonnie.location = 'cam1';
   GameState.bonnie.timer = 0;
-  
   GameState.chica.location = 'cam1';
   GameState.chica.timer = 0;
-  
   GameState.freddy.location = 'cam1';
   GameState.freddy.timer = 0;
-  
   GameState.foxy.location = 'cam3';
   GameState.foxy.timer = 0;
   GameState.foxy.phase = 0;
   GameState.foxy.runProgress = 0;
 
-  // 9. 恢復 HTML UI 顯示
-  document.getElementById('camera-panel').style.display = 'none';
-  document.getElementById('crt-effect').style.display = 'none';
-  document.getElementById('btn-door-left').style.display = 'block';
-  document.getElementById('btn-light-left').style.display = 'block';
-  document.getElementById('btn-door-right').style.display = 'block';
-  document.getElementById('btn-light-right').style.display = 'block';
+  GameState.isPaused = false;
+    
+  // 🌟 9. 恢復 HTML UI 顯示 (加上安全防呆機制！)
+  const safeSetDisplay = (id, displayStyle) => {
+      let el = document.getElementById(id);
+      if (el) el.style.display = displayStyle;
+  };
+
+  safeSetDisplay('pause-overlay', 'none');
+  safeSetDisplay('camera-panel', 'none');
+  safeSetDisplay('crt-effect', 'none');
+  safeSetDisplay('btn-door-left', 'block');
+  safeSetDisplay('btn-light-left', 'block');
+  safeSetDisplay('btn-door-right', 'block');
+  safeSetDisplay('btn-light-right', 'block');
   
   let btnMonitor = document.getElementById('btn-monitor');
-  btnMonitor.style.display = 'block';
-  btnMonitor.innerText = '打開監視器';
+  if (btnMonitor) {
+      btnMonitor.style.display = 'block';
+      btnMonitor.innerText = '打開監視器';
+  }
   
-  document.getElementById('time-display').innerText = '12 AM';
+  let timeDisplay = document.getElementById('time-display');
+  if (timeDisplay) timeDisplay.innerText = '12 AM';
 
   // 10. 重新啟動遊戲時間流逝
   GameState.gameStarted = true;
@@ -367,6 +384,31 @@ let lastMouseY = 0;
 
 
 function setupInput() {
+
+
+    function togglePause() {
+        // 如果遊戲還沒開始、已經停電、或是正在跳殺，不允許暫停！
+        if (!GameState.gameStarted || GameState.isPowerOut || GameState.isJumpscaring) return;
+
+        GameState.isPaused = !GameState.isPaused;
+        let overlay = document.getElementById('pause-overlay');
+        
+        if (GameState.isPaused) {
+            // ⏸️ 進入暫停
+            overlay.style.display = 'flex';
+            AudioManager.stop('Fan');
+            AudioManager.stop('light');
+            AudioManager.stop('light2');
+            if (AudioManager.currentPhone) AudioManager.currentPhone.pause(); // 暫停電話
+        } else {
+            // ▶️ 解除暫停
+            overlay.style.display = 'none';
+            AudioManager.loop('Fan');
+            if (GameState.rightLightOn) AudioManager.loop('light');
+            if (GameState.leftLightOn) AudioManager.loop('light2');
+            if (AudioManager.currentPhone) AudioManager.currentPhone.play(); // 恢復電話
+        }
+    }
     // UI 按鈕監聽
     document.getElementById('btn-door-left').onclick = () => {
         if(GameState.powerOutPhase > 0) return; // 停電後不能操作門了
@@ -463,6 +505,9 @@ function setupInput() {
         if (k === 'o') {
             GameState.obMode = !GameState.obMode; // 切換 OB 模式
             console.log("OB Mode:", GameState.obMode ? "ON" : "OFF");
+        }
+        if (k === 'escape' || k === 'p') {
+            togglePause();
         }
     });
 
@@ -849,6 +894,11 @@ function applyDifficulty(aiLevels) {
 
 function gameLoop() {
 
+    if (GameState.isPaused) {
+        Renderer.draw(GameState); // 保持畫面不變黑
+        requestAnimationFrame(gameLoop); // 繼續迴圈等待解除暫停
+        return; // ⛔ 攔截！下面的扣電、怪物移動全部都不會執行！
+    }
 
     if (GameState.power <= 0) {
     
@@ -1138,6 +1188,7 @@ async function loadAndParseModel(objUrl, materialDict) {
 
 
 window.onload = async () => {
+    
   setupInput();
   if (Renderer.init('webgl-canvas')) {
       console.log("正在載入所有機械玩偶模型...");
@@ -1223,6 +1274,21 @@ window.onload = async () => {
               });
           });
 
+          let btnOpenTutorial = document.getElementById('btn-open-tutorial');
+          if (btnOpenTutorial) {
+              btnOpenTutorial.onclick = () => {
+                  document.getElementById('main-menu').style.display = 'none';
+                  document.getElementById('tutorial-panel').style.display = 'block';
+              };
+          }
+          let btnCloseTutorial = document.getElementById('btn-close-tutorial');
+          if (btnCloseTutorial) {
+              btnCloseTutorial.onclick = () => {
+                  document.getElementById('tutorial-panel').style.display = 'none';
+                  document.getElementById('main-menu').style.display = 'flex';
+              };
+          }
+
           // 綁定 Custom Night 面板切換
           let btnOpenCustom = document.getElementById('btn-open-custom');
           if (btnOpenCustom) {
@@ -1275,6 +1341,8 @@ window.onload = async () => {
       }
   }
 };
+
+
 
 function startGame() {
   document.getElementById('start-screen').style.display = 'none';
