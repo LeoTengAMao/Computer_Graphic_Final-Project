@@ -854,9 +854,6 @@ const Renderer = {
 draw: function(gameState) {
         let gl = this.gl;
 
-        // ----------------------------------------------------
-        // 🔥【通道 0】SHADOW MAP PASS (從右門探照燈視角計算陰影)
-        // ----------------------------------------------------
         // 右門探照燈的世界座標 (從你的燈 7 陣列中提取)
         let lX = 0.0, lY = 4.0, lZ = 6.0; 
 
@@ -879,7 +876,7 @@ draw: function(gameState) {
         // 切換到輕量級的 shadowProgram
         gl.useProgram(this.shadowProgram);
 
-        // 🟢 核心加工：利用你原有的 drawScene 函數，但暫時用影子 Shader 跑一次
+       
         // 為了不破壞原本函數的 Shader 綁定，我們需要讓 drawBlock 等函數知道現在是在畫影子還是畫彩色。
         // 最快速安全的解法是：在 Renderer 上掛一個標記 Renderer.isDrawingShadow = true;
         this.isDrawingShadow = true;
@@ -918,9 +915,7 @@ draw: function(gameState) {
         });
 
 
-        // ----------------------------------------------------
-        // 🟢【通道 7】FINAL PASS (最終玩家螢幕畫面)
-        // ----------------------------------------------------
+        
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         this.resizeCanvas();
         gl.clearColor(0.05, 0.05, 0.05, 1.0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -963,7 +958,7 @@ draw: function(gameState) {
         this.setupLights(gameState);
         gl.uniform3f(gl.getUniformLocation(this.program, 'u_EyePos'), camX, camY, camZ);
         
-        // 🟢【重要 Uniform】傳入光的 MVP 矩陣與剛剛畫好的 Shadow Map 紋理給主要 Shader
+        // 傳入光的 MVP 矩陣與剛剛畫好的 Shadow Map 紋理給主要 Shader
         gl.uniformMatrix4fv(gl.getUniformLocation(this.program, 'u_LightMvpMatrix'), false, lightMvpMatrix.elements);
         gl.activeTexture(gl.TEXTURE3);
         gl.bindTexture(gl.TEXTURE_2D, this.shadowDepthTexture);
