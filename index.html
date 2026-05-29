@@ -122,12 +122,15 @@
     </div>
 
     <div id="ui-layer">
+        <button id="btn-pause" class="btn" style="bottom: 20px; left: 20px; border-color: #fff; z-index: 100;">⏸ PAUSE</button>
         <button id="btn-mute-call" class="btn" style="top: 20px; left: 50%; transform: translateX(-50%); display: none; border-color: yellow; color: yellow; z-index: 100;">MUTE CALL</button>
         <button id="btn-door-left" class="btn">Toggle Left Door</button>
         <button id="btn-light-left" class="btn">Toggle Left Light</button>
         <button id="btn-door-right" class="btn">Toggle Front Door</button>
         <button id="btn-light-right" class="btn">Toggle Front Light</button>
         <button id="btn-monitor" class="btn">Open Monitor</button>
+
+        
 
         <div id="power-display" style="position: absolute; top: 20px; left: 20px; font-size: 30px; font-weight: bold; color: #0f0;">
             Power: 100%
@@ -151,6 +154,12 @@
         </div>
 
         <div id="crt-effect" style="display: none; position: absolute; top:0; left:0; width:100%; height:100%; background: repeating-linear-gradient(rgba(0,0,0,0.1), rgba(0,0,0,0.1) 2px, transparent 2px, transparent 4px); pointer-events: none;"></div>
+    </div>
+
+    <div id="pause-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 9999; flex-direction: column; justify-content: center; align-items: center;">
+        <h1 style="font-size: 80px; color: white; margin-bottom: 50px; letter-spacing: 10px;">PAUSED</h1>
+        <button id="btn-resume" class="btn" style="position: relative; font-size: 30px; margin-bottom: 30px; padding: 15px 50px;">RESUME</button>
+        <button id="btn-quit" class="btn" style="position: relative; font-size: 24px; border-color: red; color: red;">QUIT TO MENU</button>
     </div>
 
     <script src="cuon-matrix.js"></script>      
