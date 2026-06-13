@@ -12,6 +12,7 @@ let currentSelectedNight = 1; // 紀錄目前玩的是第幾夜
 
 
 const GameState = {
+    isSitting: true,
     isPaused: false,
     time: 0,
     obMode: false, // 預設開啟 OB 模式，按 'O' 鍵可以切換
@@ -46,9 +47,13 @@ const GameState = {
     rightDoorClosed: false,
     rightLightOn: false,
     rightDoorY: 5.0, // 右門的物理高度
-    // 新增：專屬頻道的干擾系統
+
     flickerTimer: 0,     
     flickerCams: [],
+
+    guardX: 0,          
+    guardY: 1.5,        
+    guardZ: 12,
 
     gameStarted:false, // 遊戲是否開始了，還在讀取畫面中不能操作
     gameEnd: false, // 遊戲是否已經結束了，結束後停止一切操作
@@ -386,6 +391,8 @@ let lastMouseY = 0;
 function setupInput() {
 
 
+    
+
     function togglePause() {
         // 如果遊戲還沒開始、已經停電、或是正在跳殺，不允許暫停！
         if (!GameState.gameStarted || GameState.isPowerOut || GameState.isJumpscaring) return;
@@ -424,6 +431,19 @@ function setupInput() {
             AudioManager.stopPhone(); // 掛斷電話！
             btnMute.style.display = 'none'; // 按鈕瞬間消失
         }
+    }
+
+    let btnQuit = document.getElementById('btn-quit');
+    if (btnQuit) {
+        btnQuit.onclick = () => {
+            // 1. 先解除遊戲內部的暫停凍結狀態，否則時間會卡死
+            if (GameState.isPaused) {
+                togglePause(); 
+            }
+            
+            // 2. 呼叫你已經寫好的 returnToMenu 函數
+            returnToMenu(); 
+        };
     }
 
     document.getElementById('btn-light-left').onclick = () => {
@@ -471,6 +491,8 @@ function setupInput() {
     document.getElementById('btn-monitor').onclick = () => {
         if(GameState.powerOutPhase > 0) return;
         GameState.isMonitorOpen = !GameState.isMonitorOpen;
+
+       
         
         // 控制 UI 顯示與隱藏
         document.getElementById('camera-panel').style.display = GameState.isMonitorOpen ? 'block' : 'none';
@@ -509,6 +531,20 @@ function setupInput() {
         if (k === 'escape' || k === 'p') {
             togglePause();
         }
+        if (k === 'c') {
+            if(GameState.gameStarted && !GameState.isPaused && !GameState.isJumpscaring && !GameState.isMonitorOpen) {
+                GameState.isSitting = !GameState.isSitting;
+                
+                if (GameState.isSitting) {
+                    // 🪑 切換為坐下：移除解鎖指令，只保留回正魔法
+                    GameState.guardYaw = ((GameState.guardYaw % 360) + 360) % 360; 
+                    if (GameState.guardYaw > 180) GameState.guardYaw -= 360;
+                } else {
+                    // 🚶 切換為站立：移除鎖定指令，只保留視角同步
+                    GameState.targetGuardYaw = GameState.guardYaw; 
+                }
+            }
+        }
     });
 
     window.addEventListener('keyup', (ev) => {
@@ -527,32 +563,34 @@ function setupInput() {
     window.addEventListener('mouseup', () => isDragging = false);
 
     window.addEventListener('mousemove', (ev) => {
-        //if (!isDragging || !GameState.obMode) return;
-        
+
         if (GameState.obMode && isDragging) {
             let dx = ev.clientX - lastMouseX;
             let dy = ev.clientY - lastMouseY;
             
-            GameState.obCam.yaw -= dx * 0.2; 
-            GameState.obCam.pitch -= dy * 0.2; 
+            GameState.obCam.yaw -= ev.movementX * 0.2; 
+            GameState.obCam.pitch -= ev.movementY * 0.2;
             GameState.obCam.pitch = Math.max(-89, Math.min(89, GameState.obCam.pitch));
             
             lastMouseX = ev.clientX;
             lastMouseY = ev.clientY;
-            return; // OB 模式下不執行後面的警衛轉頭邏輯
+            return; 
         }
 
-        // --- 2. 警衛模式的滑鼠看圖邏輯 (FNAF 經典平移) ---
-        if (!GameState.obMode && !GameState.isMonitorOpen && !GameState.isJumpscaring) {
-            // 將螢幕 X 座標轉換為比例： 0(最左) ~ 1(最右)
-            let screenX = ev.clientX / window.innerWidth;
+        
+        if (GameState.gameStarted && !GameState.obMode && !GameState.isMonitorOpen && !GameState.isJumpscaring && !GameState.isPaused) {
             
-            // 轉換為 -1 (左) 到 1 (右)
-            let normalizedX = screenX * 2.0 - 1.0;
-            
-            // 限制在左右各 85 度 (快要 90 度但不會完全折斷脖子)
-            // 注意：因為 WebGL 座標系，向左看是 + 角度，所以加一個負號
-            GameState.targetGuardYaw = -normalizedX * 85; 
+            if (GameState.isSitting) {
+                // 🪑 【坐下模式：FNAF 經典平移】
+                let screenX = ev.clientX / window.innerWidth;
+                let normalizedX = screenX * 2.0 - 1.0;
+                GameState.targetGuardYaw = -normalizedX * 85; 
+                
+            } else {
+                // 🚶 【站立模式：無鎖定自由轉向】
+                // 拔除 isMouseLocked 檢查，只要滑鼠在畫面上移動，視角就跟著轉！
+                GameState.targetGuardYaw -= ev.movementX * 0.15; 
+            }
         }
 
         
@@ -575,7 +613,14 @@ let powertimer = GameState.powerlosttime;
 function updateLogic() {
     GameState.time += 0.01;
     powertimer -= 1;
-    GameState.guardYaw += (GameState.targetGuardYaw - GameState.guardYaw) * 0.01;
+    if (GameState.isSitting === false) {
+        // 站立時：瞬間轉向 (自由看四周)
+        GameState.guardYaw = GameState.targetGuardYaw;
+    } else {
+        // 坐下時：平滑過渡轉向 (FNAF 經典看圖)
+        GameState.guardYaw += (GameState.targetGuardYaw - GameState.guardYaw) * 0.05;
+    }
+    //
 
     // 門的滑動物理動畫 (Lerp)
     // 如果玩家想關門，目標高度就是 1.5 (剛好碰到地板)；如果想開門，目標就是 5.0 (藏進天花板)
@@ -603,6 +648,51 @@ function updateLogic() {
         else if (GameState.power < 50) powerUI.style.color = 'yellow';
         else powerUI.style.color = '#0f0';
     }
+
+    if (!GameState.obMode && !GameState.isMonitorOpen && !GameState.isJumpscaring && GameState.power > 0 && !GameState.gameEnd) {
+        let targetY = GameState.isSitting ? 1.6 : 1.8; // 坐下高度 1.0，站立高度 1.6
+        GameState.guardY += (targetY - GameState.guardY) * 0.1;
+
+        if (GameState.isSitting) {
+            // 🪑 坐下模式：禁止 WASD 移動，並且自動滑順地拉回辦公椅的位置 (X:0, Z:12)
+            GameState.guardX += (0 - GameState.guardX) * 0.1;
+            GameState.guardZ += (12 - GameState.guardZ) * 0.1;
+        } else {
+            // 🚶 走路模式：允許使用 WASD 自由移動
+            let walkSpeed = 0.06;
+            let rad = GameState.guardYaw * Math.PI / 180;
+
+            // 計算面向前方的向量
+            let fX = -Math.sin(rad);
+            let fZ = -Math.cos(rad);
+            let rX = Math.cos(rad);
+            let rZ = -Math.sin(rad);
+
+            let nextX = GameState.guardX;
+            let nextZ = GameState.guardZ;
+
+            if (GameState.keys.w) { nextX += fX * walkSpeed; nextZ += fZ * walkSpeed; }
+            if (GameState.keys.s) { nextX -= fX * walkSpeed; nextZ -= fZ * walkSpeed; }
+            if (GameState.keys.a) { nextX -= rX * walkSpeed; nextZ -= rZ * walkSpeed; }
+            if (GameState.keys.d) { nextX += rX * walkSpeed; nextZ += rZ * walkSpeed; }
+
+            // 【房間邊界】
+            if (nextX < -3.0) nextX = -3.0; // 左牆
+            if (nextX >  3.0) nextX =  3.0; // 右牆
+            if (nextZ <  8.5) nextZ =  8.5; // 前牆 (窗戶)
+            if (nextZ > 13.5) nextZ = 13.5; // 後牆
+
+            // 【桌子碰撞】
+            let hitDesk = (nextX > -2.0 && nextX < 2.0) && (nextZ > 9.5 && nextZ < 11.5);
+            
+            // 如果沒有撞到桌子，才允許移動！
+            if (!hitDesk) {
+                GameState.guardX = nextX;
+                GameState.guardZ = nextZ;
+            }
+        }
+    }
+
 
     if (GameState.obMode) {
       let speed = 0.2;

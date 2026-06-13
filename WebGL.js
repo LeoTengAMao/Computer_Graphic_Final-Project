@@ -297,6 +297,13 @@ const Renderer = {
     drawScene: function(projMatrix, viewMatrix, gameState) {
         // --- 這裡放你原本 draw 裡面的所有 Blockout 與繪製邏輯 ---
 
+        if (gameState.obMode) {
+            // 用深藍色的圓柱體當作警衛的身體
+            this.drawCylinder(projMatrix, viewMatrix, gameState.guardX, gameState.guardY - 0.7, gameState.guardZ, 0.4, 0.8, 0.4,  0.1, 0.2, 0.5);
+            // 用膚色的方塊當作頭部，並且會隨著滑鼠轉動！(教授最愛看這種動態互動)
+            this.drawRotatedBlock(projMatrix, viewMatrix, gameState.guardX, gameState.guardY + 0.3, gameState.guardZ, 0.3, 0.3, 0.3, gameState.guardYaw,  0.9, 0.7, 0.6);
+        }
+
         // 1. 警衛室地板
         this.drawBlock(projMatrix, viewMatrix, 0, 0, 11,  4, 0.1, 3,  0.3, 0.3, 0.3);
         // 2. 辦公桌
@@ -932,7 +939,9 @@ draw: function(gameState) {
         this.resizeCanvas();
         gl.clearColor(0.05, 0.05, 0.05, 1.0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        let camX = 0, camY = 1.5, camZ = 12;
+        camX = gameState.guardX; 
+        camY = gameState.guardY; 
+        camZ = gameState.guardZ;
         let projMatrix = new Matrix4();
         let viewMatrix = new Matrix4();
         projMatrix.setPerspective(60, this.canvas.width / this.canvas.height, 0.1, 300);
@@ -954,8 +963,11 @@ draw: function(gameState) {
                 case 'cam8': camX = 27.5;camY = 2;  camZ = 14;  viewMatrix.setLookAt(27.5, 2, 14,24, 3, -8.5, 0, 1, 0); break;
             }
         } else {
+            let eyeX = gameState.guardX, eyeY = gameState.guardY, eyeZ = gameState.guardZ; 
             let radian = gameState.guardYaw * Math.PI / 180;
-            viewMatrix.setLookAt(camX, camY, camZ, camX - Math.sin(radian), camY, camZ - Math.cos(radian), 0, 1, 0);
+            let targetX = eyeX - Math.sin(radian);
+            let targetZ = eyeZ - Math.cos(radian);
+            viewMatrix.setLookAt( eyeX, eyeY, eyeZ, targetX, eyeY, targetZ, 0, 1, 0 );
         }
 
         let isFlickering = gameState.isMonitorOpen && gameState.flickerTimer > 0 && gameState.power > 0 && gameState.flickerCams.includes(gameState.currentCam);
