@@ -1,6 +1,6 @@
 
 const NIGHT_DATA = {
-  1: { bonnie: 2, chica: 2, freddy: 0, foxy: 0 }, 
+  1: { bonnie: 1, chica: 1, freddy: 0, foxy: 0 }, 
   2: { bonnie: 5, chica: 2, freddy: 0, foxy: 0 },
   3: { bonnie: 7, chica: 5, freddy: 0, foxy: 3 },
   4: { bonnie: 8, chica: 7, freddy: 2, foxy: 5 },
@@ -988,17 +988,17 @@ function applyDifficulty(aiLevels) {
   // 公式：AI 如果是 0，時間設為 9999 秒 (永遠不動)。
   // 否則，AI 越高，數字越小 (動越快)。
   
-  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 20 - (ai * 0.7));
+  const calcNormal = (ai) => ai === 0 ? 9999 : Math.max(1.5, 25 - (ai * 0.7));
   
   GameState.bonnie.moveInterval = calcNormal(aiLevels.bonnie);
   GameState.chica.moveInterval = calcNormal(aiLevels.chica);
 
-  const calcFred = (ai) => ai === 0 ? 9999 : Math.max(1.5, 30 - (ai * 0.65));
+  const calcFred = (ai) => ai === 0 ? 9999 : Math.max(1.5, 35 - (ai * 0.65));
 
   GameState.freddy.moveInterval = calcFred(aiLevels.freddy);
 
   // Foxy 的計時器比較慢
-  const calcFoxy = (ai) => ai === 0 ? 9999 : Math.max(30, 300 - (ai * 10));
+  const calcFoxy = (ai) => ai === 0 ? 9999 : Math.max(30, 400 - (ai * 10));
   GameState.foxy.moveInterval = calcFoxy(aiLevels.foxy);
   GameState.foxy.movesave = calcFoxy(aiLevels.foxy);
   console.log("AI 難度已套用:", aiLevels);
@@ -1009,7 +1009,7 @@ function gameLoop() {
     if (GameState.isPaused) {
         Renderer.draw(GameState); // 保持畫面不變黑
         requestAnimationFrame(gameLoop); // 繼續迴圈等待解除暫停
-        return; // ⛔ 攔截！下面的扣電、怪物移動全部都不會執行！
+        return; //  攔截！下面的扣電、怪物移動全部都不會執行！
     }
 
     if (GameState.power <= 0) {
