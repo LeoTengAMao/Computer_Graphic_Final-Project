@@ -11,7 +11,7 @@ let customAI = { bonnie: 20, chica: 20, freddy: 20, foxy: 20 };
 let currentSelectedNight = 1; // 紀錄目前玩的是第幾夜
 
 
-const GameState = {
+const GameState = { 
     isSitting: true,
     isPaused: false,
     time: 0,
@@ -19,6 +19,7 @@ const GameState = {
     fanAngle:0,
     // OB 攝影機狀態
     obCam: { x: 0, y: 15, z: 20, pitch: -30, yaw: 0 }, 
+    obFov: 60,
     // 紀錄鍵盤按下的狀態
     keys: { w: false, a: false, s: false, d: false, Space: false, shift: false },
     isJumpscaring :false ,
@@ -93,6 +94,7 @@ const GameState = {
 
 function returnToMenu() {
   // 1. 移除 Game Over 或勝利的黑色遮罩層
+  AudioManager.stopPhone()
   let gameOverOverlay = document.getElementById('game-over-overlay');
   if (gameOverOverlay) gameOverOverlay.remove();
   
@@ -517,6 +519,24 @@ function setupInput() {
             AudioManager.play('cam');
             console.log("切換到攝影機:", GameState.currentCam);
         };
+    });
+
+    window.addEventListener('wheel', (ev) => {
+        // 只有在 OB 模式、遊戲進行中、且沒暫停時才允許縮放
+        if (GameState.obMode && GameState.gameStarted && !GameState.isPaused) {
+            
+            //  終極防呆：如果 obFov 不存在或是壞掉變成 NaN，立刻救回來！
+            if (GameState.obFov === undefined || isNaN(GameState.obFov)) {
+                GameState.obFov = 60;
+            }
+
+            // ev.deltaY > 0 代表往下滾 (想要拉遠視角 / FOV 變大)
+            // ev.deltaY < 0 代表往上滾 (想要拉近視角 / FOV 變小)
+            GameState.obFov += ev.deltaY * 0.05;
+
+            // 限制極限：避免畫面反轉或破圖
+            GameState.obFov = Math.max(10, Math.min(120, GameState.obFov));
+        }
     });
 
     // 鍵盤按下與放開事件

@@ -944,7 +944,11 @@ draw: function(gameState) {
         camZ = gameState.guardZ;
         let projMatrix = new Matrix4();
         let viewMatrix = new Matrix4();
-        projMatrix.setPerspective(60, this.canvas.width / this.canvas.height, 0.1, 300);
+        let currentFov = gameState.obMode && gameState.obFov !== undefined ? gameState.obFov : 60;
+        projMatrix.setPerspective(currentFov, this.canvas.width / this.canvas.height, 0.1, 300);
+        console.log('gameState:', gameState);
+        console.log('gameState.obMode:', gameState.obMode);
+        console.log('gameState.obFov:', gameState.obFov);
 
         if (gameState.obMode) {
             camX = gameState.obCam.x; camY = gameState.obCam.y; camZ = gameState.obCam.z;
