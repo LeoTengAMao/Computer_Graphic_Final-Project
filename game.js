@@ -133,6 +133,8 @@ function resetGame() {
 
   // 2. 停止所有聲音，重新啟動風扇聲
   AudioManager.stop('Fan');
+
+  GameState.obFov = 60;
   
   // 3. 大腦狀態大洗牌 (時光倒流)
   GameState.timeElapsed = 0;
